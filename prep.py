@@ -146,6 +146,20 @@ def dem_sampler():
         x0 = np.clip(x0, 0, big.shape[1] - 2); y0 = np.clip(y0, 0, big.shape[0] - 2)
         return (big[y0, x0] * (1 - fx) * (1 - fy) + big[y0, x0 + 1] * fx * (1 - fy)
                 + big[y0 + 1, x0] * (1 - fx) * fy + big[y0 + 1, x0 + 1] * fx * fy)
+    # terén z laseru DMR 5G (nastroje/teren_dmr.py), kde je; mimo jeho rozsah Terrarium
+    if os.path.exists('build/teren_dmr.npz'):
+        _d = np.load('build/teren_dmr.npz'); _Z = _d['z'].astype(np.float64); _x0, _y1, _r = float(_d['x0']), float(_d['y1']), float(_d['res'])
+        print('terén z DMR 5G (laser ČÚZK)')
+
+        def sample_dmr(px, py):
+            wx, wy = np.asarray(px) + CX, np.asarray(py) + CY          # světové souřadnice mapy
+            fx = (wx - _x0) / _r - 0.5; fy = (_y1 - wy) / _r - 0.5
+            x0 = np.floor(fx).astype(int); y0 = np.floor(fy).astype(int); ax = fx - x0; ay = fy - y0
+            ok = (x0 >= 0) & (y0 >= 0) & (x0 < _Z.shape[1] - 1) & (y0 < _Z.shape[0] - 1)
+            x0 = np.clip(x0, 0, _Z.shape[1] - 2); y0 = np.clip(y0, 0, _Z.shape[0] - 2)
+            v = (_Z[y0, x0] * (1 - ax) * (1 - ay) + _Z[y0, x0 + 1] * ax * (1 - ay) + _Z[y0 + 1, x0] * (1 - ax) * ay + _Z[y0 + 1, x0 + 1] * ax * ay)
+            return np.where(ok, v, sample(px, py))
+        return sample_dmr
     return sample
 
 
@@ -162,6 +176,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 _hook('terrain')
 HX = sliding_window_view(np.pad(HX, 1, mode='edge'), (3, 3)).mean(axis=(2, 3))
 HMIN = HREF; HX = HX - HMIN              # společná výška pro všechny čtverce
+HX = HX * float(geo.MESTO.get('teren_prevyseni', 1.0))   # volitelné převýšení reliéfu (stejné ve všech čtvercích), např. 1.5
 H = HX[MS:MS + N, MS:MS + N]
 
 
@@ -172,6 +187,38 @@ def ground(x, y):
     return (HX[y0, x0] * (1 - tx) * (1 - ty) + HX[y0, x0 + 1] * tx * (1 - ty)
             + HX[y0 + 1, x0] * (1 - tx) * ty + HX[y0 + 1, x0 + 1] * tx * ty)
 
+
+# ---------------- hradby a opěrné zdi jako svislé stěny (útesy ve stylu SimCity 2000) ----------------
+# U zdi s výškovým rozdílem terénu se svah zalomí: body mřížky do 6 m od zdi dostanou výšku své strany (nahoře / dole),
+# zeď se pak kreslí od paty po korunu (scene.lines.cliff). Hradby na rovině jsou samostatná zeď 3,5 m.
+CLIFFS = []
+_inf0 = load('infrastructure')
+_ext = box(-RE, -RE, RE, RE)
+_gpts = shapely.points(gx.ravel(), gy.ravel())
+for _, r in _inf0.iterrows():
+    if r['class'] not in ('city_wall', 'retaining_wall'): continue
+    for l in lines(r.geom):
+        if l.length < 15 or not l.intersects(_ext): continue          # úlomky hradeb v parku vynechat
+        l = l.segmentize(2.0); P_ = np.array(l.coords)[:, :2]
+        d_ = np.gradient(P_, axis=0); n_ = np.stack([-d_[:, 1], d_[:, 0]], 1); n_ /= np.linalg.norm(n_, axis=1, keepdims=True) + 1e-9
+        zl = ground(*(P_ + n_ * 7).T); zr = ground(*(P_ - n_ * 7).T)
+        diff = float(np.median(np.abs(zl - zr))); city = r['class'] == 'city_wall'
+        if diff < 2.5: continue                                  # jen skutečné terénní stupně (hradba na rovině = běžná zeď)
+        if True:                                         # zalomení terénu u zdi
+            st = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(P_, axis=0).T))])
+            hi, lo = np.maximum(zl, zr), np.minimum(zl, zr); left_hi = np.median(zl - zr) > 0
+            near = np.where(shapely.dwithin(_gpts, l, 8.0))[0]
+            if len(near):
+                pp = shapely.get_coordinates(_gpts[near]); t_ = shapely.line_locate_point(l, _gpts[near])
+                a_ = shapely.get_coordinates(shapely.line_interpolate_point(l, np.maximum(t_ - 0.5, 0)))
+                b_ = shapely.get_coordinates(shapely.line_interpolate_point(l, np.minimum(t_ + 0.5, l.length)))
+                cross = (b_[:, 0] - a_[:, 0]) * (pp[:, 1] - a_[:, 1]) - (b_[:, 1] - a_[:, 1]) * (pp[:, 0] - a_[:, 0])
+                on_hi = (cross > 0) == left_hi
+                val = np.where(on_hi, np.interp(t_, st, hi), np.interp(t_, st, lo))
+                HX.flat[near] = val
+        CLIFFS.append((l, city, diff))
+_hook('cliffs')
+if CLIFFS: print('hradeb a opěrných zdí', len(CLIFFS), 'z toho se zalomeným terénem', sum(1 for c in CLIFFS if c[2] >= 1.5))
 
 print('terén', N, 'x', N, 'převýšení', round(float(H.max()), 1), 'm')
 
@@ -487,13 +534,28 @@ bridge_segs = []
 for _k, items in _bg.items():
     for l in lines(shapely.ops.linemerge(shapely.MultiLineString([q for g0, _r in items for q in lines(g0)]))):
         bridge_segs.append((l, max(items, key=lambda it: it[0].intersection(l.buffer(0.5)).length)[1]))
+# chodník mostu zakreslený v OSM zvlášť (sidewalk=separate): lávka, která z většiny vede v pásu silničního mostu, se nekreslí
+# jako druhá mostovka vedle (s vlastními pilíři a odbočkou k nábřeží), silniční mostovka se o ni rozšíří
+_road_b = [(l, r) for l, r in bridge_segs if _bkind(r) == 'road']
+_road_tree = shapely.STRtree([l for l, _ in _road_b]) if _road_b else None
+_sidewalk_w, _keep = {}, []
+for l, r in bridge_segs:
+    if _bkind(r) == 'foot' and _road_tree is not None:
+        hit = next((k for k in _road_tree.query(l.buffer(15))
+                    if l.intersection(_road_b[k][0].buffer(rwidth(_road_b[k][1]) / 2 + 3.5, cap_style=2)).length >= 0.7 * l.length), None)
+        if hit is not None:
+            _sidewalk_w[_road_b[hit][0].wkb] = _sidewalk_w.get(_road_b[hit][0].wkb, 0.0) + 2.4
+            continue
+    _keep.append((l, r))
+if len(_keep) < len(bridge_segs): print('chodníků sloučených se silničním mostem', len(bridge_segs) - len(_keep))
+bridge_segs = _keep
 DECKS = []                                  # (čára, vzdálenosti, výšky mostovky, výšky terénu, šířka, druh, třída, název)
 for g0, r in bridge_segs:
     for l in lines(g0):
         if not l.intersects(DRAWBOX): continue
         c = r['class']
         kind = 'rail' if r.subtype == 'rail' else 'foot' if c in FOOT else 'road'
-        w = 4.5 if kind == 'rail' else rwidth(r)
+        w = 4.5 if kind == 'rail' else rwidth(r) + _sidewalk_w.get(g0.wkb, 0.0)
         bc = [q[:2] for q in l.coords]
         def _dir(a, b):
             n_ = math.dist(a, b) or 1; return ((a[0] - b[0]) / n_, (a[1] - b[1]) / n_)
@@ -545,6 +607,11 @@ for qb in UP.get('bridges', []):
         t_ = bd / max(bd[-1], 0.1)
         bz = bgz + 0.35 + qb.get('h', 1.2) * np.sin(np.pi * t_)
         DECKS.append((bl, bd, bz, bgz, qb.get('w', 2.5), qb.get('k', 'foot'), qb.get('c', 'footway'), None, 1))
+# mosty z dat, které nahrazuje vlastní model (assets/upresneni.json "skryt_mosty": [[lat, lon], …], mostovka do 12 m od bodu)
+if UP.get('skryt_mosty'):
+    _sk = [Point(*to_local(lo, la)) for la, lo in UP['skryt_mosty']]
+    _n0 = len(DECKS); DECKS = [q for q in DECKS if not any(q[0].distance(p_) < 12 for p_ in _sk)]
+    if _n0 > len(DECKS): print('skrytých mostů z dat (vlastní model)', _n0 - len(DECKS))
 print('mostů', len(DECKS), 'z toho lávek', sum(k[5] == 'foot' for k in DECKS), 'nájezdů', len(_rcut))
 def _rest(l_, cuts):                       # cesta bez úseků pod mostovkami
     out, a = [], 0.0
@@ -879,7 +946,7 @@ def match_doms():
             for k in tree.query(pt.buffer(sp['glass'])): DOM_BY_ID.setdefault(idx[k].id, {**d, 'spec': {'rc': [176, 204, 214], 'r': 'flat', 'win': 14}})
             continue
         hit = [k for k in tree.query(pt.buffer(25)) if geoms[k].area > 60]
-        inside = [k for k in hit if geoms[k].buffer(1.0).contains(pt)]
+        inside = sorted((k for k in hit if geoms[k].buffer(1.0).contains(pt)), key=lambda k: geoms[k].area)   # vnořené půdorysy (hala pod střechou): nejmenší
         cand = inside or sorted(hit, key=lambda k: -geoms[k].area)
         if cand: DOM_BY_ID[idx[cand[0]].id] = d
 
@@ -1169,7 +1236,7 @@ for _, r in bld.iterrows():
         so = SAT['b'].get(r.id, {})
         dom = DOM_BY_ID.get(r.id); dsp = dom['spec'] if dom else None
         if dsp:
-            lm = 'dom'; tenement = panel = False
+            lm = dsp.get('lm', 'dom'); tenement = panel = False      # vlastní model z assets/custom_models.js má přednost
             if 'r' in dsp: rs = 'flat' if dsp['r'] == 'flat' else dsp['r']
         if not lm and so.get('rs') == 'flat': rs = 'flat'; tenement = False
         # šikmá ze snímku jen u menších domů: velké a vysoké budovy mají na snímku vlastní stín a techniku (falešný hřeben)
@@ -1319,6 +1386,8 @@ for _, r in bld.iterrows():
         if dsp:
             top_ = b['e'] + (b['rh'] if b['r'] != 'flat' else 0.0)
             if b.get('dz'): top_ = max(top_, b['e'] + max(q[6] for q in b['dz']))
+            if b.get('tw'): top_ = max(top_, max(t['h'] for t in b['tw']))           # věže dominanty (vozidla se za ně schovají)
+            if 'top' in dsp: top_ = max(top_, gnd + float(dsp['top']))               # vlastní model (lm) vyšší než budova v datech
         binfo.append({'id': bid, 'oid': key, 'name': nm, 'cls': CLS_CZ.get(c, 'budova' if not c else c), 'floors': floors,
                       'h': round(total, 1), 'roof': rs, 'addr': adrs, 'lon': round(float(lon), 6), 'lat': round(float(lat), 6),
                       'ring': ring_, 'top': round(top_, 2), 'base': round(base, 2),
@@ -1332,20 +1401,22 @@ for d in DOMS:
     if not EXT_P.contains(Point(x, y)): continue
     own = AREA.contains(Point(x, y)); g = float(ground(x, y))
     bid = len(buildings)
-    tw0 = (sp.get('towers') or [{'w': 4, 'h': sp.get('h', 0)}])[0]   # bez věží (jen vlastní model 'lm'): půdorys 4 × 4 m, výška 'h'
+    tw0 = (sp.get('towers') or [{'w': sp.get('w', 4), 'h': sp.get('h', 0)}])[0]   # bez věží (jen vlastní model 'lm'): půdorys w × w m (výchozí 4), výška 'h'
     w0 = tw0['w'] / 2
     ring = [[round(x - w0, 2), round(y - w0, 2)], [round(x + w0, 2), round(y - w0, 2)], [round(x + w0, 2), round(y + w0, 2)], [round(x - w0, 2), round(y + w0, 2)]]
     b = {'p': ring, 'b': round(g - 0.6, 2), 'g': round(g, 2), 'e': round(g, 2), 'r': 'flat', 'rh': 0.0, 'parts': [], 'wc': (150, 146, 136), 'rc': (150, 146, 136),
          's': 4, 'id': bid, 'lm': sp.get('lm', 'dom'), 'dn': d['name'], 'only': 1, 'tw': []}
+    # výšky terénu ve vybraných bodech pro vlastní model ("probe": {"jméno": [lat, lon]} -> b['probe'][jméno], stejné měřítko jako b.g)
+    if sp.get('probe'): b['probe'] = {k: round(float(ground(*to_local(lo, la))), 2) for k, (la, lo) in sp['probe'].items()}
     for tw in sp.get('towers', []):
         b['tw'].append({'x': round(x, 2), 'y': round(y, 2), 'a': 0.0, 'w': tw['w'], 'h': round(g + tw['h'], 2), 'to': round(g + tw.get('to', tw['h']), 2),
                         'top': tw['top'], 'tc': tw.get('tc', [90, 96, 104]), 'wc': [150, 146, 136], 'clock': 0, 'round': tw.get('round', 0),
                         'stone': tw.get('stone', 0), 'ruin': tw.get('ruin', 0), 'b': round(g - 0.6, 2)})
     if not own: b['gh'] = 1
     buildings.append(b)
-    r_ = 14 + tw0['w']; nd.ellipse([*P([(x - r_, y + r_)])[0], *P([(x + r_, y - r_)])[0]], fill=255)   # bez stromů kolem
+    r_ = 10 + tw0['w'] * 0.75; nd.ellipse([*P([(x - r_, y + r_)])[0], *P([(x + r_, y - r_)])[0]], fill=255)   # bez stromů kolem
     if own:
-        th_ = tw0.get('to', tw0['h'])
+        th_ = sp.get('top', tw0.get('to', tw0['h']))
         binfo.append({'id': bid, 'oid': d['name'], 'name': d['name'], 'cls': sp.get('cls', 'dominanta'),
                       'floors': None, 'h': round(float(th_), 1), 'roof': 'cone', 'addr': [], 'lon': round(float(d['lon']), 6), 'lat': round(float(d['lat']), 6),
                       'ring': ring, 'top': round(g + th_, 2), 'base': round(g - 0.6, 2)})
@@ -1480,6 +1551,17 @@ for _, r in inf.iterrows():
         l = l.segmentize(4.0)
         xs_, ys_ = np.array(l.coords).T
         lines_out[kk].append([[round(x, 2), round(y, 2), round(float(zz), 2)] for x, y, zz in zip(xs_, ys_, ground(xs_, ys_))])
+# hradby a opěrné zdi (útesy): [x, y, pata, koruna, hradba 0/1] po 2 m; pata a koruna z terénu 6 m po obou stranách
+lines_out['cliff'] = []
+for l, city, diff in CLIFFS:
+    for q in lines(l.intersection(AREA)):
+        if q.length < 1: continue
+        q = q.segmentize(2.0); P_ = np.array(q.coords)[:, :2]
+        d_ = np.gradient(P_, axis=0) if len(P_) > 1 else np.array([[1.0, 0.0]]); n_ = np.stack([-d_[:, 1], d_[:, 0]], 1); n_ /= np.linalg.norm(n_, axis=1, keepdims=True) + 1e-9
+        za, zb = ground(*(P_ + n_ * 6).T), ground(*(P_ - n_ * 6).T)
+        lo, hi = np.minimum(za, zb), np.maximum(za, zb)
+        top = hi + (1.1 if city else 0.6)
+        lines_out['cliff'].append([[round(x, 2), round(y, 2), round(float(a), 2), round(float(b), 2), int(city)] for (x, y), a, b in zip(P_, lo, top)])
 for k in props: props[k] = [[round(v, 3) for v in q] for q in props[k]]
 cars = [[round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(a, 3), ci] for x, y, a, ci in cars]
 cars += [[round(x, 2), round(y, 2), round(z, 2), round(a, 3), ci] for x, y, z, a, ci in ROOF_CARS if AREA.contains(Point(x, y))]   # parkoviště na střechách
@@ -1490,8 +1572,11 @@ for a, e, k in UP['buses']:
 portals = [[round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(a, 3)] for x, y, a in portals if AREA.contains(Point(x, y))]
 if os.path.exists('assets/potrubi.json'):         # nadzemní potrubí (nastroje/kominy.py)
     lines_out['pipe'] = []
+    _skp = [Point(*to_local(lo, la)) for la, lo in UP.get('skryt_potrubi', [])]   # potrubí, které v datech vede nad zemí, ale ve skutečnosti ne
     for q in json.load(open('assets/potrubi.json')):
-        for l in lines(LineString([to_local(lo, la) for la, lo in q]).intersection(EXT)):
+        _ln = LineString([to_local(lo, la) for la, lo in q])
+        if any(_ln.distance(p_) < 10 for p_ in _skp): continue
+        for l in lines(_ln.intersection(EXT)):
             xy_ = shapely.get_coordinates(shapely.segmentize(l, 10.0))
             lines_out['pipe'].append([[round(float(x), 2), round(float(y), 2), round(float(zz), 2)] for (x, y), zz in zip(xy_, ground(xy_[:, 0], xy_[:, 1]))])
 print({k: len(v) for k, v in props.items()}, 'aut', len(cars), {k: len(v) for k, v in lines_out.items()})

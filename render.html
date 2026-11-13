@@ -988,6 +988,21 @@ function roofDeco(b, X, eave, rc) {
       }
     }
   }
+  // hradby a opěrné zdi jako útesy (prep.py: scene.lines.cliff, body [x, y, pata, koruna, hradba]): svislé zdivo s pásy a římsou
+  for (const pl of (scene.lines.cliff || [])) for (let i = 0; i < pl.length - 1; i++) {
+    const [x0, y0, a0, b0, city] = pl[i], [x1, y1, a1, b1] = pl[i + 1], len = Math.hypot(x1 - x0, y1 - y0); if (len < 0.05) continue;
+    const w = city ? 0.9 : 0.6, nx = -(y1 - y0) / len * w, ny = (x1 - x0) / len * w, aw = [0, 1, 1, 0];
+    const col = city ? [0.62, 0.40, 0.31] : [0.58, 0.56, 0.52], dark = col.map((v) => v * 0.86), cap = col.map((v) => v * 1.12);
+    const A = (x, y, z) => tv(x, y, z);
+    const hmax = Math.max(b0 - a0, b1 - a1), nb = Math.max(1, Math.round(hmax / 1.2));
+    for (let k = 0; k < nb; k++) {                                     // vodorovné pásy zdiva (střídavě tmavší)
+      const za0 = a0 - 0.3 + (b0 - a0 + 0.3) * k / nb, za1 = a0 - 0.3 + (b0 - a0 + 0.3) * (k + 1) / nb;
+      const zb0 = a1 - 0.3 + (b1 - a1 + 0.3) * k / nb, zb1 = a1 - 0.3 + (b1 - a1 + 0.3) * (k + 1) / nb, c = k % 2 ? dark : col;
+      pushQuad(L, A(x0 + nx, y0 + ny, za0), A(x1 + nx, y1 + ny, zb0), A(x1 + nx, y1 + ny, zb1), A(x0 + nx, y0 + ny, za1), c, aw);
+      pushQuad(L, A(x1 - nx, y1 - ny, zb0), A(x0 - nx, y0 - ny, za0), A(x0 - nx, y0 - ny, za1), A(x1 - nx, y1 - ny, zb1), c, aw);
+    }
+    pushQuad(L, A(x0 + nx * 1.25, y0 + ny * 1.25, b0), A(x1 + nx * 1.25, y1 + ny * 1.25, b1), A(x1 - nx * 1.25, y1 - ny * 1.25, b1), A(x0 - nx * 1.25, y0 - ny * 1.25, b0), cap, aw);   // římsa
+  }
   // nadzemní potrubí (nastroje/kominy.py): rezavá trubka na sloupcích
   for (const pl of (scene.lines.pipe || [])) for (let i = 0; i < pl.length - 1; i++) {
     const [x0, y0, z0] = pl[i], [x1, y1, z1] = pl[i + 1], len = Math.hypot(x1 - x0, y1 - y0); if (len < 0.1) continue;

@@ -1,0 +1,112 @@
+{
+  "nazev": "Hradec Králové",
+  "titulek": "Izometrický Hradec Králové",
+  "h1": [
+    "Izometrický",
+    "Hradec Králové"
+  ],
+  "podtitul": "Hradec Králové z otevřených dat, ve stylu SimCity 2000.",
+  "popis": "Izometrická pixel-art mapa: Hradec Králové ve stylu SimCity 2000. Roční období, den a noc, počasí a příběhy míst.",
+  "url": "https://hradeczive.vercel.app",
+  "stred": [
+    15.83009,
+    50.20539
+  ],
+  "polovina": 1150.0,
+  "ctverce": [
+    [
+      -1,
+      2
+    ],
+    [
+      0,
+      2
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      2
+    ],
+    [
+      -1,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      1
+    ],
+    [
+      -1,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1,
+      0
+    ],
+    [
+      2,
+      0
+    ],
+    [
+      -1,
+      -1
+    ],
+    [
+      0,
+      -1
+    ],
+    [
+      1,
+      -1
+    ],
+    [
+      2,
+      -1
+    ]
+  ],
+  "href": 233.3,
+  "dno": -40,
+  "mhd": {
+    "gtfs": "https://www.spojenka.cz/jrdata/jizdnirady-gtfs.zip",
+    "zdroj": "DPMHK (jízdní řády z CIS JŘ)",
+    "zdroj_url": "https://portal.cisjr.cz/",
+    "dopravce": [
+      "A194"
+    ],
+    "barvy": {
+      "karoserie": "#2c2e33",
+      "spodek": "#c62a36",
+      "pruh": "#c62a36",
+      "celo": "#b9bdc3",
+      "strecha": "#cfd2d6"
+    }
+  },
+  "vanocni_strom": [
+    50.20932,
+    15.833
+  ],
+  "potoky": false,
+  "letadla": false,
+  "teren_prevyseni": 1.6,
+  "dalsi_zdroje": [
+    {
+      "text": "povrchy ulic, dopravní značení, stromy, zeleň, veřejné osvětlení a nábřežní zdi © Statutární město Hradec Králové (pasport komunikací, pasport zeleně, DTMM)",
+      "url": "https://geoportal.mmhk.cz/"
+    }
+  ]
+}

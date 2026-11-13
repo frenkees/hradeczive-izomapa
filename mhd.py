@@ -1,7 +1,7 @@
 """MHD podle jízdních řádů (GTFS, adresa v mesto.json mhd.gtfs) -> site/mhd.json
 
 python mhd.py [--stahnout]   stáhne build/gtfs.zip (při --stahnout nebo když je starší než den) a převede ho:
-  routes   [číslo linky, typ (0 tramvaj, 2 vlak, 3 autobus)]
+  routes   [číslo linky, typ (0 tramvaj, 2 vlak, 3 autobus, 11 trolejbus)]
   shapes   trasy ve světových souřadnicích mapy [[x, y], ...] (zjednodušené na 1 m)
   services kalendář {id: [po..ne (7× 0/1), od, do, [přidané dny], [zrušené dny]]}
   trips    [linka, trasa, služba, začátek (s od půlnoci), [Δt, vzdálenost po trase (m)] × zastávky, cíl, [zastávka, Δt příjezdu] × zastávky]
@@ -25,9 +25,20 @@ T = lambda n: (csv.DictReader(io.TextIOWrapper(zf.open(n + '.txt'), encoding='ut
 sec = lambda t: (lambda h, m, s: h * 3600 + m * 60 + s)(*map(int, t.split(':')))
 
 AREA = shapely.union_all([shapely.box(x - HALF, y - HALF, x + HALF, y + HALF) for x, y in map(chunk_center, CHUNKS)])
-# tramvaj 0 / 900–906, autobus 3 / 700–716, trolejbus 11 / 800 (kreslí se jako autobus); vlak 2, jen s volbou "vlak" a s tvary tras (po silnicích jezdit nemůže); lanovky prohlížeč nekreslí
-KIND = lambda t: 0 if t == 0 or 900 <= t <= 906 else 3 if t in (3, 11, 800) or 700 <= t <= 716 else 2 if t == 2 and MESTO.get('vlak') and 'shapes.txt' in zf.namelist() else None
-RT = {r['route_id']: r for r in T('routes') if KIND(int(r['route_type'] or 3)) is not None}
+# tramvaj 0 / 900–906, autobus 3 / 700–716, trolejbus 11 / 800 (druh 11, autobus se sběrači); vlak 2, jen s volbou "vlak" a s tvary tras (po silnicích jezdit nemůže); lanovky prohlížeč nekreslí
+# trolejbus má vlastní druh 11 (prohlížeč ho kreslí jako autobus se sběrači)
+KIND = lambda t: 0 if t == 0 or 900 <= t <= 906 else 11 if t in (11, 800) else 3 if t == 3 or 700 <= t <= 716 else 2 if t == 2 and MESTO.get('vlak') and 'shapes.txt' in zf.namelist() else None
+# celostátní GTFS (CIS JŘ) má všechny dopravce: "dopravce" v mesto.json vybere jen některé (agency_id nebo část názvu)
+DOPR = (MESTO.get('mhd') or {}).get('dopravce')
+if DOPR:
+    _ag = {a['agency_id'] for a in T('agency') if any(d == a['agency_id'] or d.lower() in a['agency_name'].lower() for d in DOPR)}
+    print('dopravci', sorted(_ag))
+RT = {r['route_id']: r for r in T('routes') if KIND(int(r['route_type'] or 3)) is not None and (not DOPR or r.get('agency_id') in _ag)}
+# CIS JŘ má v route_short_name licenční číslo linky (615011), skutečné číslo je v dlouhém názvu („linka: 11“)
+import re as _re
+for _r in RT.values():
+    _m = _re.search(r'linka\s*:\s*([0-9]+[A-ZŠ]?)', _r.get('route_long_name') or '')
+    if _m and len(_r['route_short_name']) > 4: _r['route_short_name'] = _m.group(1)
 trips = [t for t in T('trips') if t['route_id'] in RT]
 SN, SXY = {}, {}
 for r in T('stops'):
@@ -127,7 +138,7 @@ for sid, (x, y) in SXY.items():
     n_ = NI.get(SN.get(sid))
     if n_ is None or n_ not in _obsl or not AREA.contains(shapely.Point(x, y)): continue
     if any(q[0] == n_ and abs(q[1] - x) < 6 and abs(q[2] - y) < 6 for q in stops): continue   # stejné místo vícekrát (nástupiště, stanice)
-    stops.append([n_, round(x, 1), round(y, 1), 0 if 0 in _obsl[n_] else 3])
+    stops.append([n_, round(x, 1), round(y, 1), 0 if 0 in _obsl[n_] else 3])   # trolejbus (11) má zastávku jako autobus
 print('zastávek na mapě', len(stops))
 # odstav na konečné: kolej za zastávkou končí slepě (do 160 m), tramvaj čeká vzadu na konci koleje, ne na nástupišti
 # {tvar: [[[x, y], …] od zastávky po konec koleje, …]}, nejvýš dvě koleje, ať se vozy můžou vystřídat

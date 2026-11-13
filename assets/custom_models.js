@@ -1,0 +1,541 @@
+// Vlastní 3D modely dominant Hradce Králové (napárované přes assets/dominanty.json, "spec": {"lm": "..."}).
+// Předlohy: volně licencované fotky z Wikimedia Commons v landmarks_ref/<dominanta>/ (zdroje v ZDROJE.md).
+// Souřadnice: frameAt(x, y, 0, úhel) -> f(s, t, výška), s podél osy, t napříč, výška absolutně (b.g = terén).
+// Buffery: W = zdi (okna podle stylu), R = střechy, X = plné díly; aw = [svítí v noci, nebarvit, sníh nahoře, 0].
+
+const C = (r, g, b) => [r / 255, g / 255, b / 255];
+
+// hlavní osa půdorysu: střed a úhel nejdelší strany
+function axis(ring) {
+  let cx = 0, cy = 0;
+  for (const [x, y] of ring) { cx += x; cy += y; }
+  cx /= ring.length; cy /= ring.length;
+  let best = 0, ang = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % ring.length], l = Math.hypot(x1 - x0, y1 - y0);
+    if (l > best) { best = l; ang = Math.atan2(y1 - y0, x1 - x0); }
+  }
+  return { cx, cy, ang };
+}
+
+// zeď s okny podle stylu st (shader zdí): stejné atributy jako zdi budov v render.html
+function wall(W, pushQuad, tv, g, x0, y0, x1, y1, z0, z1, col, st) {
+  const len = Math.hypot(x1 - x0, y1 - y0), lo = z0 - g, hi = z1 - g;
+  pushQuad(W, tv(x0, y0, z0), tv(x1, y1, z0), tv(x1, y1, z1), tv(x0, y0, z1), col, [[0, lo, len, st], [len, lo, len, st], [len, hi, len, st]]);
+  W.a.splice(W.a.length - 12, 12, 0, lo, len, st, len, hi, len, st, 0, hi, len, st);
+}
+
+// hranol nad mnohoúhelníkem (body proti směru hodin): zdi s okny a plochá střecha
+function prism(W, R, pushQuad, pushTri, tv, g, pts, z0, z1, cols, st, roof) {
+  for (let i = 0; i < pts.length; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % pts.length];
+    wall(W, pushQuad, tv, g, x0, y0, x1, y1, z0, z1, typeof cols === 'function' ? cols(i) : cols, st);
+  }
+  for (let i = 1; i < pts.length - 1; i++) pushTri(R, tv(...pts[0], z1), tv(...pts[i], z1), tv(...pts[i + 1], z1), roof, [0, 0, 0, 0]);
+}
+
+// půdorys v osách: střed, jednotkové vektory delší (u) a kratší (v) osy a rozsahy průmětů
+function frame2(ring) {
+  const { cx, cy, ang } = axis(ring), u = [Math.cos(ang), Math.sin(ang)], v = [-u[1], u[0]];
+  let s0 = 1e9, s1 = -1e9, t0 = 1e9, t1 = -1e9;
+  for (const [x, y] of ring) { const s = (x - cx) * u[0] + (y - cy) * u[1], t = (x - cx) * v[0] + (y - cy) * v[1]; s0 = Math.min(s0, s); s1 = Math.max(s1, s); t0 = Math.min(t0, t); t1 = Math.max(t1, t); }
+  if (s1 - s0 < t1 - t0) return frame2swap(ring, cx, cy, ang);
+  return { cx, cy, ang, u, v, s0, s1, t0, t1 };
+}
+function frame2swap(ring, cx, cy, ang) {
+  const a = ang + Math.PI / 2, u = [Math.cos(a), Math.sin(a)], v = [-u[1], u[0]];
+  let s0 = 1e9, s1 = -1e9, t0 = 1e9, t1 = -1e9;
+  for (const [x, y] of ring) { const s = (x - cx) * u[0] + (y - cy) * u[1], t = (x - cx) * v[0] + (y - cy) * v[1]; s0 = Math.min(s0, s); s1 = Math.max(s1, s); t0 = Math.min(t0, t); t1 = Math.max(t1, t); }
+  return { cx, cy, ang: a, u, v, s0, s1, t0, t1 };
+}
+
+// klenba nad půdorysem: body se po patrech stahují k podélné ose (valená klenba s konci podle obrysu)
+function vault(R, pushQuad, tv, ring, F, z0, rise, col, steps = 7) {
+  const tm = (F.t0 + F.t1) / 2;
+  const lvl = (k) => {
+    const a = (k / steps) * Math.PI / 2, kk = Math.cos(a), z = z0 + rise * Math.sin(a);
+    return ring.map(([x, y]) => {
+      const s = (x - F.cx) * F.u[0] + (y - F.cy) * F.u[1], t = (x - F.cx) * F.v[0] + (y - F.cy) * F.v[1], t2 = tm + (t - tm) * Math.max(kk, 0.04);
+      return tv(F.cx + F.u[0] * s + F.v[0] * t2, F.cy + F.u[1] * s + F.v[1] * t2, z);
+    });
+  };
+  let prev = lvl(0);
+  for (let k = 1; k <= steps; k++) {
+    const cur = lvl(k), sh = 0.86 + 0.14 * Math.sin(k / steps * Math.PI / 2);
+    for (let i = 0; i < ring.length; i++) { const j = (i + 1) % ring.length; pushQuad(R, prev[i], prev[j], cur[j], cur[i], col.map((q) => q * sh), [0, 0, 0, 0]); }
+    prev = cur;
+  }
+}
+
+// vodorovné bílé pásy (římsy) po obvodu půdorysu ve výškách zs, mírně vystouplé ze zdi
+function bands(X, pushQuad, tv, b, zs, col) {
+  for (const z of zs) for (let i = 0; i < b.p.length; i++) {
+    const [x0, y0] = b.p[i], [x1, y1] = b.p[(i + 1) % b.p.length], len = Math.hypot(x1 - x0, y1 - y0); if (len < 0.05) continue;
+    const nx = (y1 - y0) / len * 0.18, ny = -(x1 - x0) / len * 0.18;
+    pushQuad(X, tv(x0 + nx, y0 + ny, z - 0.35), tv(x1 + nx, y1 + ny, z - 0.35), tv(x1 + nx, y1 + ny, z + 0.35), tv(x0 + nx, y0 + ny, z + 0.35), col, [0.1, 1, 0, 0]);
+  }
+}
+const GOLD_HK = [0.85, 0.72, 0.30];
+
+const SEASON =(typeof location !== 'undefined' && new URLSearchParams(location.search).get('season')) || 'autumn';
+
+export const landmarks = {
+  // Zimní stadion (Komenského 1214): horní část fasády je mozaika modrého skla (obdélníky v pěti odstínech), pod ní
+  // tmavá markýza a ustoupený prosklený parter, nízká klenutá šedá střecha (ortofoto). Běžný kód kreslí jen nízký sokl (h).
+  zimni_stadion(b, { X, R, pushBox, pushQuad, tv }) {
+    const F = frame2(b.p), g = b.g, P = (s, t, z) => tv(F.cx + F.u[0] * s + F.v[0] * t, F.cy + F.u[1] * s + F.v[1] * t, z);
+    const z1 = g + 4.4, z2 = g + 5.1, z3 = g + 15.2, GLASS = C(52, 66, 84), CANOPY = C(66, 68, 74);
+    const BLUES = [C(18, 52, 128), C(28, 84, 168), C(58, 118, 198), C(14, 36, 92), C(88, 150, 214), C(40, 100, 186)];
+    const rect = [[F.s0, F.t0], [F.s1, F.t0], [F.s1, F.t1], [F.s0, F.t1]];
+    const IN = 2.6;                                                      // parter ustoupený pod markýzou
+    const inner = [[F.s0 + IN, F.t0 + IN], [F.s1 - IN, F.t0 + IN], [F.s1 - IN, F.t1 - IN], [F.s0 + IN, F.t1 - IN]];
+    for (let i = 0; i < 4; i++) {
+      const [a0, b0] = rect[i], [a1, b1] = rect[(i + 1) % 4], [c0, d0] = inner[i], [c1, d1] = inner[(i + 1) % 4];
+      pushQuad(X, P(c0, d0, b.b), P(c1, d1, b.b), P(c1, d1, z1), P(c0, d0, z1), GLASS, [0.55, 1, 0, 0]);             // prosklený parter
+      pushQuad(X, P(a0, b0, z1), P(a1, b1, z1), P(a1, b1, z2), P(a0, b0, z2), CANOPY, [0, 1, 0, 0]);                   // čelo markýzy
+      pushQuad(X, P(a0, b0, z1), P(c0, d0, z1), P(c1, d1, z1), P(a1, b1, z1), CANOPY.map((q) => q * 0.7), [0, 1, 0, 0]); // podhled
+      // skleněná mozaika: buňky 2,4 × 1,7 m, odstín podle polohy (stejný ve všech čtvercích)
+      const len = Math.hypot(a1 - a0, b1 - b0), nc = Math.max(1, Math.round(len / 2.4)), nr = Math.round((z3 - z2) / 1.7);
+      for (let c = 0; c < nc; c++) for (let r = 0; r < nr; r++) {
+        const h = Math.abs(Math.sin((c + 1) * 12.9898 + (r + 1) * 78.233 + i * 37.719) * 43758.5453) % 1;
+        const fa = c / nc, fb = (c + 1) / nc, za = z2 + (z3 - z2) * r / nr, zb = z2 + (z3 - z2) * (r + 1) / nr;
+        const A = [a0 + (a1 - a0) * fa, b0 + (b1 - b0) * fa], B = [a0 + (a1 - a0) * fb, b0 + (b1 - b0) * fb];
+        pushQuad(X, P(A[0], A[1], za), P(B[0], B[1], za), P(B[0], B[1], zb), P(A[0], A[1], zb), BLUES[Math.floor(h * BLUES.length)], [h > 0.9 ? 0.25 : 0, 1, 0, 0]);
+      }
+    }
+    // střecha: římsa a nízká klenba přes kratší rozměr
+    pushQuad(R, P(F.s0, F.t0, z3), P(F.s1, F.t0, z3), P(F.s1, F.t1, z3), P(F.s0, F.t1, z3), C(140, 142, 146), [0, 0, 0, 0]);
+    vault(R, pushQuad, tv, rect.map(([s, t]) => [F.cx + F.u[0] * s + F.v[0] * t, F.cy + F.u[1] * s + F.v[1] * t]), F, z3 + 0.05, 3.2, C(150, 152, 156));
+    return true;
+  },
+  // Hala II zimního stadionu: oválný půdorys, nízké stěny a bílá klenutá střecha (ortofoto, fotka z Commons)
+  zimni_hala2(b, { R, pushQuad, tv }) {
+    const F = frame2(b.p);
+    vault(R, pushQuad, tv, b.p, F, b.e, 5.5, C(236, 236, 232), 8);
+    return true;
+  },
+  // Terminál HD (P. Kotas, 2008): pole bílých membránových střech (3 bloky × 3 řady oblouků), mezi bloky dvě prosklené „lodě“
+  // ve tvaru čočky s ocelovými žebry, nad jejich konci bílé stožáry do V s lany. Půdorys střechy z dat (142 × 78 m),
+  // rozmístění lodí a polí z ortofota ČÚZK, tvar z fotek na Commons. Prosklené haly pod střechou kreslí běžný kód (nízké).
+  terminal_hd(b, { X, R, ring, pushBox, pushQuad, pushTri, tv, frameAt }) {
+    // samostatná stavba ('only') na středu střechy: rozměry a natočení z dat (střecha má díry, prep by ji rozřezal na kusy)
+    let cx = 0, cy = 0; for (const [x, y] of b.p) { cx += x / b.p.length; cy += y / b.p.length; }
+    const A = -5 * Math.PI / 180, u = [Math.cos(A), Math.sin(A)], v = [-u[1], u[0]];
+    const F = { cx, cy, ang: A, u, v, s0: -71, s1: 71, t0: -39, t1: 39 };
+    const g = b.g, Ls = F.s1 - F.s0, sm = 0, tm = 0;
+    const P = (s, t, z) => tv(F.cx + F.u[0] * s + F.v[0] * t, F.cy + F.u[1] * s + F.v[1] * t, z);
+    const WHITE = C(240, 240, 236), WHITE_D = C(214, 216, 214), GLASS = C(128, 160, 184), RIB = C(70, 84, 96), STEEL = C(228, 230, 232);
+    const spine = [sm - 0.255 * Ls, sm + 0.255 * Ls], SW = 7.0;          // lodě: osa a poloviční šířka v nejširším místě
+    const blocks = [[F.s0, spine[0] - SW - 0.5], [spine[0] + SW + 0.5, spine[1] - SW - 0.5], [spine[1] + SW + 0.5, F.s1]];
+    const rows = 3, E = 7.6, TOP = 11.2;                                  // výška okraje a vrcholu membrány
+    for (const [a, c] of blocks) for (let r = 0; r < rows; r++) {
+      const t0 = F.t0 + (F.t1 - F.t0) * r / rows, t1 = F.t0 + (F.t1 - F.t0) * (r + 1) / rows, n = 8;
+      for (let k = 0; k < n; k++) {                                        // oblouk napříč (t), rovně podél (s)
+        const ta = t0 + (t1 - t0) * k / n, tb = t0 + (t1 - t0) * (k + 1) / n;
+        const za = g + E + (TOP - E) * Math.sin(Math.PI * k / n), zb = g + E + (TOP - E) * Math.sin(Math.PI * (k + 1) / n);
+        pushQuad(R, P(a, ta, za), P(c, ta, za), P(c, tb, zb), P(a, tb, zb), k < n / 2 ? WHITE : WHITE_D, [0, 0, 1, 0]);
+      }
+      for (const s of [a, c]) for (const t of [t0, t1]) pushBox(X, frameAt(...[F.cx + F.u[0] * s + F.v[0] * t, F.cy + F.u[1] * s + F.v[1] * t], 0, F.ang), -0.25, 0.25, -0.25, 0.25, g, g + E, STEEL, [0, 1, 0, 0]);
+    }
+    // prosklené lodě: čočka v půdorysu (šířka ~ sin podél t), klenutá do 14 m, žebra po 4 m
+    for (const sc of spine) {
+      const n = 12, hw = (k) => SW * Math.sin(Math.PI * k / n) + 0.6;
+      for (let k = 0; k < n; k++) {
+        const ta = F.t0 + (F.t1 - F.t0) * k / n, tb = F.t0 + (F.t1 - F.t0) * (k + 1) / n, wa = hw(k), wb = hw(k + 1);
+        for (const sd of [-1, 1]) {
+          pushQuad(R, P(sc + sd * wa, ta, g + E + 1), P(sc + sd * wb, tb, g + E + 1), P(sc + sd * wb * 0.35, tb, g + 14), P(sc + sd * wa * 0.35, ta, g + 14), GLASS, [0, 0, 0, 0]);
+          pushQuad(R, P(sc + sd * wa * 0.35, ta, g + 14), P(sc + sd * wb * 0.35, tb, g + 14), P(sc, tb, g + 14.6), P(sc, ta, g + 14.6), GLASS.map((q) => q * 1.08), [0, 0, 0, 0]);
+        }
+        pushBox(X, frameAt(...[F.cx + F.u[0] * sc + F.v[0] * ta, F.cy + F.u[1] * sc + F.v[1] * ta], 0, F.ang), -wa * 0.9, wa * 0.9, -0.12, 0.12, g + E + 1, g + E + 1.5, RIB, [0, 1, 0, 0]);
+      }
+      // stožáry do V na obou koncích lodi s lany k hřebeni
+      for (const te of [F.t0 - 2, F.t1 + 2]) for (const sd of [-1, 1]) {
+        const bx = sc + sd * 1.2, tx = sc + sd * 6.5, H = 27;
+        const base = [F.cx + F.u[0] * bx + F.v[0] * te, F.cy + F.u[1] * bx + F.v[1] * te], top = [F.cx + F.u[0] * tx + F.v[0] * te, F.cy + F.u[1] * tx + F.v[1] * te];
+        const N = 6;
+        for (let k = 0; k < N; k++) {
+          const f0 = k / N, f1 = (k + 1) / N, p0 = [base[0] + (top[0] - base[0]) * f0, base[1] + (top[1] - base[1]) * f0], p1 = [base[0] + (top[0] - base[0]) * f1, base[1] + (top[1] - base[1]) * f1];
+          ring(X, (s, t, h) => (h < g + H * f1 - 0.01 ? frameAt(p0[0], p0[1], 0, 0)(s, t, h) : frameAt(p1[0], p1[1], 0, 0)(s, t, h)), 0.32, 0.28, g + H * f0, g + H * f1, 6, STEEL, [0, 1, 0, 0]);
+        }
+        const tin = te + (te < tm ? 18 : -18);                              // lano od vrcholu stožáru k hřebeni lodi
+        const a = tv(top[0], top[1], g + H), c = P(sc, tin, g + 14.6), d = 0.08;
+        pushQuad(X, a, c, [c[0], c[1] + d, c[2]], [a[0], a[1] + d, a[2]], C(200, 202, 206), [0, 1, 0, 0]);
+      }
+    }
+    return true;
+  },
+  // Fontána uprostřed okružní křižovatky Koruna: kruhová nádrž, osm bílých oblouků prohnutých ven jako koruna
+  // (konce v noci svítí), uprostřed svislé hroty a modrý prstenec. Střed z ortofota ČÚZK, tvar z fotek na Commons.
+  koruna(b, { X, R, ring, pushBox, frameAt, pushTri, tv }) {
+    let cx = 0, cy = 0; for (const [x, y] of b.p) { cx += x / b.p.length; cy += y / b.p.length; }
+    const g = b.g, f = frameAt(cx, cy, 0, 0), WHITE = C(242, 242, 240), WATER = SEASON === 'winter' ? C(186, 210, 228) : C(110, 186, 220);
+    ring(X, f, 6.6, 6.6, g - 0.2, g + 0.45, 24, C(200, 200, 196), [0, 1, 1, 0]);               // obruba nádrže
+    for (let k = 0; k < 24; k++) {                                                            // hladina
+      const a0 = k / 24 * Math.PI * 2, a1 = (k + 1) / 24 * Math.PI * 2;
+      pushTri(R, f(0, 0, g + 0.4), f(Math.cos(a0) * 6.3, Math.sin(a0) * 6.3, g + 0.4), f(Math.cos(a1) * 6.3, Math.sin(a1) * 6.3, g + 0.4), WATER, [0, 0, 0, 0]);
+    }
+    ring(X, f, 4.2, 4.2, g + 0.42, g + 0.55, 24, C(60, 120, 230), [0.9, 1, 0, 0]);             // modrý světelný prstenec
+    for (let k = 0; k < 8; k++) {                                                             // oblouky koruny
+      const a = (k + 0.5) / 8 * Math.PI * 2, N = 10, pt = (q) => [8 + 12.5 * q ** 1.8, 17 * (1 - (1 - q) ** 2)];
+      for (let i = 0; i < N; i++) {
+        const [r0, z0] = pt(i / N), [r1, z1] = pt((i + 1) / N), w0 = 0.55 - 0.3 * i / N, w1 = 0.55 - 0.3 * (i + 1) / N;
+        const p0 = frameAt(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, 0, 0), p1 = frameAt(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1, 0, 0);
+        ring(X, (s, t, h) => (h < g + z1 - 0.001 ? p0(s, t, h) : p1(s, t, h)), w0, w1, g + z0, g + z1, 6, WHITE, [0, 1, 0, 0]);
+      }
+      const [rt, zt] = pt(1);
+      pushBox(X, frameAt(cx + Math.cos(a) * rt, cy + Math.sin(a) * rt, 0, a), -0.45, 0.45, -0.45, 0.45, g + zt, g + zt + 0.8, C(255, 246, 220), [1, 1, 0, 0]);   // světlo
+    }
+    for (let k = 0; k < 5; k++) {                                                             // svislé hroty uprostřed
+      const a = k / 5 * Math.PI * 2, ff = frameAt(cx + Math.cos(a) * 1.4, cy + Math.sin(a) * 1.4, 0, 0);
+      ring(X, ff, 0.3, 0.05, g + 0.4, g + 9 + (k % 2) * 2.5, 6, WHITE, [0, 1, 0, 0]);
+    }
+    return true;
+  },
+  // Hotel Černigov (J. Zídka, 70. léta, ~55 m, nejvyšší budova města): bílá desková věž s vodorovnými pásy oken
+  // na jižní části půdorysu, na severu nízká podnož. Půdorys z dat (v datech jen nízký), tvar z ortofota a fotek (archiweb.cz).
+  cernigov(b, { X, R, W, pushBox, pushQuad, pushTri, tv }) {
+    const F = frame2(b.p), g = b.g, P = (s, t, z) => tv(F.cx + F.u[0] * s + F.v[0] * t, F.cy + F.u[1] * s + F.v[1] * t, z);
+    const sS = F.u[1] > 0 ? F.s0 : F.s1, sN = sS + (F.u[1] > 0 ? 62 : -62);   // jižní konec půdorysu a 62 m k severu
+    const a = Math.min(sS, sN), s1 = Math.max(sS, sN), tm = (F.t0 + F.t1) / 2, hd = 8.2;
+    const top = g + 55, WH = C(236, 236, 232), BAND = C(84, 96, 112), RED = C(196, 40, 52);
+    const pts = [[a, tm - hd], [s1, tm - hd], [s1, tm + hd], [a, tm + hd]];
+    for (let i = 0; i < 4; i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % 4], side = i % 2 === 0;
+      pushQuad(X, P(x0, y0, b.e), P(x1, y1, b.e), P(x1, y1, top), P(x0, y0, top), WH, [0, 1, 0, 0]);
+      if (side) for (let z = b.e + 1.4; z < top - 2; z += 3.0) {           // pásy oken a lodžií na dlouhých stranách
+        const o = (i === 0 ? -1 : 1) * 0.06;
+        pushQuad(X, P(x0, y0 + o, z), P(x1, y1 + o, z), P(x1, y1 + o, z + 1.5), P(x0, y0 + o, z + 1.5), BAND, [0.45, 1, 0, 0]);
+      } else for (let z = b.e + 1.4; z < top - 2; z += 3.0) {               // čela: úzký svislý pás oken uprostřed
+        const o = (i === 1 ? 1 : -1) * 0.06, xm = (x0 + x1) / 2 + o;
+        pushQuad(X, P(xm, tm - 1.6, z), P(xm, tm + 1.6, z), P(xm, tm + 1.6, z + 1.5), P(xm, tm - 1.6, z + 1.5), BAND, [0.45, 1, 0, 0]);
+      }
+    }
+    pushQuad(R, P(a, tm - hd, top), P(s1, tm - hd, top), P(s1, tm + hd, top), P(a, tm + hd, top), C(160, 162, 164), [0, 0, 0, 0]);
+    pushBox(X, (s, t, h) => P(a + 6 + s, tm + t, h), -3, 3, -hd - 0.8, hd + 0.8, top, top + 3.2, C(222, 222, 218), [0, 1, 1, 0]);   // strojovna
+    pushBox(X, (s, t, h) => P(a + 30 + s, tm - hd - 0.1 + t, h), -9, 9, -0.12, 0, top - 4.2, top - 1.6, RED, [0.8, 1, 0, 0]);          // nápis na fasádě
+    return true;
+  },
+  // Studijní a vědecká knihovna (Projektil, 2008): pohledový beton, tvar X, nepravidelně rozházená kruhová okna,
+  // zlatavé svislé lamely nad vstupem. Hmotu kreslí běžný kód (zdi bez oken), tady se přidají okna a lamely.
+  knihovna(b, { X, pushBox, frameAt }) {
+    const DARK = C(52, 58, 66), GOLD = C(176, 132, 60);
+    let longest = 0, li = 0;
+    for (let i = 0; i < b.p.length; i++) {
+      const [x0, y0] = b.p[i], [x1, y1] = b.p[(i + 1) % b.p.length], len = Math.hypot(x1 - x0, y1 - y0);
+      if (len > longest) { longest = len; li = i; }
+      if (len < 4) continue;
+      const ang = Math.atan2(y1 - y0, x1 - x0), nx = (y1 - y0) / len, ny = -(x1 - x0) / len;   // normála ven (obrys proti směru hodin)
+      for (let z = b.g + 2.2; z < b.e - 1.2; z += 2.6) for (let d = 1.5; d < len - 1.5; d += 2.2) {
+        const h = Math.abs(Math.sin(d * 12.9898 + z * 78.233 + i * 3.17) * 43758.5453) % 1;
+        if (h > 0.42) continue;                                                // rozházená okna, ne mřížka
+        const x = x0 + (x1 - x0) * d / len + nx * 0.05, y = y0 + (y1 - y0) * d / len + ny * 0.05;
+        pushBox(X, frameAt(x, y, 0, ang), -0.45, 0.45, -0.04, 0.04, z, z + 0.9, DARK, [0.5, 1, 0, 0]);
+      }
+    }
+    const [x0, y0] = b.p[li], [x1, y1] = b.p[(li + 1) % b.p.length], len = longest, ang = Math.atan2(y1 - y0, x1 - x0);
+    const nx = (y1 - y0) / len, ny = -(x1 - x0) / len, xm = (x0 + x1) / 2 + nx * 0.12, ym = (y0 + y1) / 2 + ny * 0.12;
+    for (let k = -8; k <= 8; k++) pushBox(X, frameAt(xm + Math.cos(ang) * k * 0.55, ym + Math.sin(ang) * k * 0.55, 0, ang), -0.12, 0.12, -0.12, 0.12, b.g + 3.5, b.e - 0.3, GOLD, [0, 1, 0, 0]);
+    return true;
+  },
+  // Regionální centrála ČSOB (Projektil + R. Brychta, 2021): zaoblená hmota, tmavé sklo mezi bílými vodorovnými pásy desek,
+  // zelená střecha s atrii. Hmotu kreslí běžný kód (tmavé zdi, pásová okna), tady bílé pásy na každém podlaží.
+  csob(b, { X, pushQuad, tv }) {
+    const WH = C(234, 234, 230);
+    for (let z = b.g + 3.9; z <= b.e + 0.01; z += 3.8) {
+      const zz = Math.min(z, b.e);
+      for (let i = 0; i < b.p.length; i++) {
+        const [x0, y0] = b.p[i], [x1, y1] = b.p[(i + 1) % b.p.length], len = Math.hypot(x1 - x0, y1 - y0); if (len < 0.05) continue;
+        const nx = (y1 - y0) / len * 0.35, ny = -(x1 - x0) / len * 0.35;
+        pushQuad(X, tv(x0 + nx, y0 + ny, zz - 0.55), tv(x1 + nx, y1 + ny, zz - 0.55), tv(x1 + nx, y1 + ny, zz), tv(x0 + nx, y0 + ny, zz), WH, [0, 1, 0, 0]);
+        pushQuad(X, tv(x0, y0, zz), tv(x1, y1, zz), tv(x1 + nx, y1 + ny, zz), tv(x0 + nx, y0 + ny, zz), WH, [0, 1, 0, 0]);
+      }
+    }
+    return true;
+  },
+  // ---- Hučák (F. Sander, 1909–12), podle volně licencovaných fotek z jihu, ze zadu a v noci (podklady/hučák) ----
+  // Jez s mostem: dvě jezová pole s přepadem a pěnou, nad nimi světlý most se segmentovými oblouky a balustrádou,
+  // na pilíři mezi poli domek obsluhy s mansardou. Výšky z terénu (probe): horní voda, dolní voda a břehy na koncích mostu.
+  jez_hucak(b, { X, R, frameAt, pushBox, pushQuad }) {
+    let cx = 0, cy = 0; for (const [x, y] of b.p) { cx += x / b.p.length; cy += y / b.p.length; }
+    const pr = b.probe || {}, up = pr.hore ?? b.g + 1.4, dn = pr.dole ?? b.g, deck = Math.max(pr.breh_z ?? up + 3, pr.breh_v ?? up + 3, up + 3.2);
+    const A = [-31.0, 23.9], B = [27.0, -20.2];                          // konce mostu vůči středu (na březích)
+    const L = Math.hypot(B[0] - A[0], B[1] - A[1]), ux = (B[0] - A[0]) / L, uy = (B[1] - A[1]) / L;
+    const ang = Math.atan2(uy, ux), mx = cx + (A[0] + B[0]) / 2, my = cy + (A[1] + B[1]) / 2;
+    const f = frameAt(mx, my, 0, ang), hl = L / 2;                       // s podél mostu (západ -> východ), t napříč (+ proti proudu)
+    const STONE = C(206, 204, 196), STONE_D = C(170, 168, 160), CONC = C(150, 148, 140), WHITE = C(236, 234, 226);
+    const WATER = SEASON === 'winter' ? C(186, 210, 228) : C(64, 124, 190), FOAM = C(236, 242, 246), FOAM2 = C(184, 212, 230);
+    // pilíře: pole 1 a 2 jsou jezová, třetí oblouk u budovy je odpad z turbín; krajní body jsou opěry na březích
+    const piers = [-hl, -hl * 0.32, hl * 0.22, hl];
+    for (const ps of piers.slice(1, -1)) {
+      pushBox(X, f, ps - 2.2, ps + 2.2, -5.5, 4.5, dn - 0.5, deck, STONE_D, [0, 1, 1, 0], STONE);
+      pushBox(X, f, ps - 2.6, ps + 2.6, -6.4, -5.2, dn - 0.5, dn + 1.2, CONC, [0, 1, 0, 0]);
+    }
+    for (let k = 0; k < piers.length - 1; k++) {
+      const s0 = piers[k] + (k === 0 ? 0 : 2.2), s1 = piers[k + 1] - (k === piers.length - 2 ? 0 : 2.2), sp = s1 - s0;
+      if (k < 2) {                                                       // jezové pole: horní voda, koruna, přepad, pěna
+        pushQuad(R, f(s0, 0.6, up), f(s1, 0.6, up), f(s1, 14, up), f(s0, 14, up), WATER, [0, 0, 0, 0]);
+        pushBox(X, f, s0, s1, -0.6, 0.6, dn - 0.4, up + 0.2, CONC, [0, 1, 1, 0]);
+        const n = Math.max(3, Math.round(sp / 1.6));
+        for (let i = 0; i < n; i++) {
+          const a = s0 + sp * i / n, c = s0 + sp * (i + 1) / n;
+          pushQuad(R, f(a, -0.6, up + 0.1), f(c, -0.6, up + 0.1), f(c, -3.8, dn + 0.08), f(a, -3.8, dn + 0.08), i % 2 ? FOAM : FOAM2, [0, 0, 0, 0]);
+          const d = 3 + 3 * ((i * 7) % 5) / 5;
+          pushQuad(R, f(a, -3.8, dn + 0.09), f(c, -3.8, dn + 0.09), f(c, -3.8 - d, dn + 0.09), f(a, -3.8 - d, dn + 0.09), i % 3 ? FOAM : FOAM2, [0, 0, 0, 0]);
+        }
+      }
+      const rise = Math.min(4.5, deck - dn - 0.8), N = 10;                // segmentový oblouk: čela a podhled
+      for (const tt of [-2.4, 2.4]) for (let i = 0; i < N; i++) {
+        const a = s0 + sp * i / N, c = s0 + sp * (i + 1) / N;
+        const za = deck - 1.0 - rise * (1 - Math.sin(Math.PI * i / N)), zc = deck - 1.0 - rise * (1 - Math.sin(Math.PI * (i + 1) / N));
+        pushQuad(X, f(a, tt, za), f(c, tt, zc), f(c, tt, deck), f(a, tt, deck), tt < 0 ? STONE : STONE_D, [0, 1, 0, 0]);
+        pushQuad(X, f(a, -2.4, za), f(c, -2.4, zc), f(c, 2.4, zc), f(a, 2.4, za), STONE_D.map((q) => q * 0.8), [0, 1, 0, 0]);
+      }
+    }
+    pushQuad(R, f(-hl, -2.4, deck), f(hl, -2.4, deck), f(hl, 2.4, deck), f(-hl, 2.4, deck), C(178, 172, 164), [0, 0, 1, 0]);   // mostovka
+    for (const tt of [-2.3, 2.3]) {                                       // balustráda: sloupky po 0,9 m a madlo
+      for (let s = -hl + 0.5; s < hl; s += 0.9) pushBox(X, f, s - 0.12, s + 0.12, tt - 0.12, tt + 0.12, deck, deck + 0.95, WHITE, [0, 1, 0, 0]);
+      pushBox(X, f, -hl, hl, tt - 0.2, tt + 0.2, deck + 0.95, deck + 1.15, WHITE, [0, 1, 1, 0]);
+    }
+    for (const ps of piers.slice(1, -1)) for (const tt of [-2.6, 2.6]) {  // lampy na pilířích (v noci svítí)
+      pushBox(X, f, ps - 0.1, ps + 0.1, tt - 0.1, tt + 0.1, deck, deck + 3.4, C(60, 62, 66), [0, 1, 0, 0]);
+      pushBox(X, f, ps - 0.3, ps + 0.3, tt - 0.3, tt + 0.3, deck + 3.4, deck + 4.0, C(255, 236, 190), [1, 1, 0, 0]);
+    }
+    // domek obsluhy jezu na prostředním pilíři: bílé zdi, tmavá mansarda, hrot
+    const ks = piers[1], kf = (s, t, h) => f(ks + s, t - 1.0, h), M = C(72, 76, 84);
+    pushBox(X, kf, -2.1, 2.1, -3.0, 3.0, deck, deck + 4.2, WHITE, [0.4, 1, 0, 0]);
+    for (const [s0, s1] of [[-1.6, -0.5], [0.5, 1.6]]) pushBox(X, kf, s0, s1, -3.05, -2.98, deck + 1.6, deck + 3.4, C(60, 70, 84), [0.6, 1, 0, 0]);
+    const z0 = deck + 4.2, z1 = deck + 6.4;
+    pushQuad(R, kf(-2.4, -3.3, z0), kf(2.4, -3.3, z0), kf(1.6, -2.0, z1), kf(-1.6, -2.0, z1), M, [0, 0, 1, 0]);
+    pushQuad(R, kf(2.4, 3.3, z0), kf(-2.4, 3.3, z0), kf(-1.6, 2.0, z1), kf(1.6, 2.0, z1), M, [0, 0, 1, 0]);
+    pushQuad(R, kf(-2.4, 3.3, z0), kf(-2.4, -3.3, z0), kf(-1.6, -2.0, z1), kf(-1.6, 2.0, z1), M.map((q) => q * 0.9), [0, 0, 1, 0]);
+    pushQuad(R, kf(2.4, -3.3, z0), kf(2.4, 3.3, z0), kf(1.6, 2.0, z1), kf(1.6, -2.0, z1), M.map((q) => q * 0.9), [0, 0, 1, 0]);
+    pushQuad(R, kf(-1.6, -2.0, z1), kf(1.6, -2.0, z1), kf(1.6, 2.0, z1), kf(-1.6, 2.0, z1), M.map((q) => q * 1.1), [0, 0, 1, 0]);
+    pushBox(X, kf, -0.06, 0.06, -0.06, 0.06, z1, z1 + 1.2, GOLD_HK, [0, 1, 0, 0]);
+    return true;
+  },
+  // Hlavní budova Hučáku: červené cihly s bílými omítanými pásy, tmavá mansarda (kreslí běžný kód podle dominanty),
+  // tady bílé římsy a hodinová věž na nároží u jezu: cihlový dřík s bílými lizénami, bílé patro s ciferníky (v noci svítí žlutě),
+  // bílý zaoblený štít do řeky, strmá tmavá mansardová báň s hrotem.
+  hucak_budova(b, { X, R, frameAt, pushBox, pushQuad, ring, tv }) {
+    const WHITE = C(238, 234, 222), BRICK = C(178, 78, 52), SLATE = C(66, 70, 78), DIAL = C(250, 222, 120);
+    bands(X, pushQuad, tv, b, [b.g + 0.9, b.g + 4.6, b.e - 0.5], WHITE);
+    if (!b.tw || !b.tw.length) return true;
+    const t = b.tw[0], f = frameAt(t.x, t.y, 0, t.a), T = 3.6, z1 = b.g + 14.0, z2 = b.g + 23.5, z3 = b.g + 30.5;
+    pushBox(X, f, -T, T, -T, T, b.b, z1, BRICK, [0, 1, 0, 0]);
+    for (const s of [-T, T]) for (const tt of [-T, T]) pushBox(X, f, s - 0.45, s + 0.45, tt - 0.45, tt + 0.45, b.b, z1, WHITE, [0, 1, 0, 0]);
+    const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (let z = b.g + 6; z < z1 - 1; z += 4.2) for (const [nx, ny] of SIDES)
+      pushBox(X, f, nx ? nx * T - 0.05 : -0.7, nx ? nx * T + 0.05 : 0.7, ny ? ny * T - 0.05 : -0.7, ny ? ny * T + 0.05 : 0.7, z, z + 2.0, C(56, 62, 72), [0.5, 1, 0, 0]);
+    pushBox(X, f, -T - 0.3, T + 0.3, -T - 0.3, T + 0.3, z1, z2, WHITE, [0, 1, 0, 0], WHITE);
+    for (const [nx, ny] of SIDES) {
+      const d = T + 0.36, r = 1.5, zc = (z1 + z2) / 2;
+      for (let k = 0; k < 6; k++) {
+        const v0 = -r + 2 * r * k / 6, v1 = -r + 2 * r * (k + 1) / 6, w = r * Math.sqrt(1 - (((v0 + v1) / 2) / r) ** 2);
+        pushBox(X, f, nx ? nx * d - 0.05 : -w, nx ? nx * d + 0.05 : w, ny ? ny * d - 0.05 : -w, ny ? ny * d + 0.05 : w, zc + v0, zc + v1, DIAL, [0.95, 1, 0, 0]);
+      }
+    }
+    const q = [[T + 0.4, z2], [T * 0.92, z2 + 4.6], [T * 0.45, z2 + 6.0], [0.25, z3]];   // mansardová báň
+    for (let k = 0; k < q.length - 1; k++) ring(R, f, q[k][0] * Math.SQRT2, q[k + 1][0] * Math.SQRT2, q[k][1], q[k + 1][1], 4, SLATE.map((v) => v * (k === 1 ? 1.1 : 1)), [0, 0, 1, 0], Math.PI / 4);
+    const N = 8, R0 = T + 0.1;                                            // bílý zaoblený štít na jižní straně (k jezu)
+    for (let k = 0; k < N; k++) {
+      const a0 = Math.PI * k / N, a1 = Math.PI * (k + 1) / N;
+      pushQuad(X, f(-R0 * Math.cos(a0), -T - 0.42, z2), f(-R0 * Math.cos(a1), -T - 0.42, z2), f(-R0 * Math.cos(a1), -T - 0.42, z2 + 5.2 * Math.sin(a1)), f(-R0 * Math.cos(a0), -T - 0.42, z2 + 5.2 * Math.sin(a0)), WHITE, [0.15, 1, 0, 0]);
+    }
+    pushBox(X, f, -0.07, 0.07, -0.07, 0.07, z3, z3 + 2.4, GOLD_HK, [0, 1, 0, 0]);
+    ring(X, f, 0.35, 0.35, z3 + 1.2, z3 + 1.7, 6, GOLD_HK, [0, 1, 0, 0]);
+    return true;
+  },
+  // Strojovna Hučáku: dlouhá hala podél řeky, na straně do řeky velká půlkruhová okna v bílých rámech (po ~22 m),
+  // bílé římsy a na hřebeni jehlanové lucerny. Hmota, střecha a cihlové zdi z běžného kódu.
+  hucak_hala(b, { X, R, frameAt, pushBox, pushQuad, ring, tv }) {
+    const WHITE = C(238, 234, 222), GLASS = C(60, 70, 82), SLATE = C(84, 88, 96);
+    bands(X, pushQuad, tv, b, [b.g + 0.9, b.e - 0.4], WHITE);
+    let best = null;                                                      // dlouhá stěna do řeky (normála nejvíc k západu)
+    for (let i = 0; i < b.p.length; i++) {
+      const [x0, y0] = b.p[i], [x1, y1] = b.p[(i + 1) % b.p.length], len = Math.hypot(x1 - x0, y1 - y0);
+      if (len < 15) continue;
+      const nx = (y1 - y0) / len, ny = -(x1 - x0) / len;
+      if (!best || nx < best.nx) best = { x0, y0, x1, y1, len, nx, ny };
+    }
+    if (best) {
+      const { x0, y0, x1, y1, len, nx, ny } = best, ang = Math.atan2(y1 - y0, x1 - x0), n = Math.max(1, Math.round(len / 22));
+      for (let k = 0; k < n; k++) {
+        const d = len * (k + 0.5) / n, x = x0 + (x1 - x0) * d / len + nx * 0.06, y = y0 + (y1 - y0) * d / len + ny * 0.06;
+        const fw = frameAt(x, y, 0, ang), r = Math.min(5.5, (b.e - b.g) * 0.42), zc = b.e - 1.2 - r, NS = 8;
+        pushBox(X, fw, -r - 0.6, r + 0.6, -0.05, 0.05, b.g + 1.2, zc, WHITE, [0, 1, 0, 0]);
+        pushBox(X, fw, -r, r, -0.09, 0.09, b.g + 1.6, zc, GLASS, [0.6, 1, 0, 0]);
+        for (let i = 0; i < NS; i++) {
+          const v0 = r * i / NS, v1 = r * (i + 1) / NS, w = Math.sqrt(Math.max(0, r * r - v1 * v1)), wo = Math.sqrt(Math.max(0, (r + 0.6) ** 2 - v0 * v0));
+          pushBox(X, fw, -wo, wo, -0.05, 0.05, zc + v0, zc + v1, WHITE, [0, 1, 0, 0]);
+          pushBox(X, fw, -w, w, -0.09, 0.09, zc + v0, zc + v1, GLASS, [0.6, 1, 0, 0]);
+        }
+        for (let s = -r + 1.2; s < r; s += 1.2) pushBox(X, fw, s - 0.06, s + 0.06, -0.11, 0.11, b.g + 1.6, zc + Math.sqrt(Math.max(0, r * r - s * s)), WHITE, [0, 1, 0, 0]);
+      }
+    }
+    if (b.parts && b.parts.length) {                                      // lucerny na hřebeni
+      const [pcx, pcy, pa, PL, PW] = b.parts.reduce((a, q) => (q[3] * q[4] > a[3] * a[4] ? q : a));
+      const top = b.e + Math.min(PW / 2 * Math.tan(40 * Math.PI / 180), b.rh || 7);
+      for (const t of [-0.25, 0.25]) {
+        const fl = frameAt(pcx + Math.cos(pa) * PL * t, pcy + Math.sin(pa) * PL * t, 0, pa);
+        pushBox(X, fl, -1.6, 1.6, -1.6, 1.6, top - 1.2, top + 1.4, WHITE, [0.3, 1, 0, 0]);
+        ring(R, fl, 2.6, 0, top + 1.4, top + 4.4, 4, SLATE, [0, 0, 1, 0], Math.PI / 4);
+        pushBox(X, fl, -0.06, 0.06, -0.06, 0.06, top + 4.4, top + 5.4, GOLD_HK, [0, 1, 0, 0]);
+      }
+    }
+    return true;
+  },
+
+  // Malšovická aréna (2023) se čtyřmi „lízátky“ – památkově chráněnými stožáry osvětlení původního Všesportovního stadionu.
+  // Budova arény v datech Overture zatím chybí, proto samostatná stavba ('only') na středu hřiště: obdélník tribun se světlou
+  // lamelovou fasádou a bílou střechou kolem hřiště (111 × 70 m, osa 110°), stožáry na bodech osvětlení z OSM, nakloněné k hřišti.
+  malsovicka_arena(b, { X, W, R, frameAt, ring, pushBox, pushQuad, pushTri, tv }) {
+    let cx = 0, cy = 0; for (const [x, y] of b.p) { cx += x / b.p.length; cy += y / b.p.length; }
+    const g = b.g, A = 110.4 * Math.PI / 180, f = frameAt(cx, cy, 0, A);
+    const FAS = C(200, 203, 206), FAS_D = C(150, 154, 160), ROOF = C(236, 238, 238), INNER = C(96, 98, 104);
+    // tribuny: vnější obdélník 147 × 116 m, vnitřní (okraj střechy) 125 × 84 m
+    const oL = 73.5, oW = 58, iL = 62.5, iW = 42, H0 = 17.5, H1 = 20.5;
+    const out = [[-oL, -oW], [oL, -oW], [oL, oW], [-oL, oW]], inn = [[-iL, -iW], [iL, -iW], [iL, iW], [-iL, iW]];
+    for (let i = 0; i < 4; i++) {
+      const [a0, b0] = out[i], [a1, b1] = out[(i + 1) % 4], [c0, d0] = inn[i], [c1, d1] = inn[(i + 1) % 4];
+      pushQuad(X, f(a0, b0, g - 0.6), f(a1, b1, g - 0.6), f(a1, b1, g + H0), f(a0, b0, g + H0), FAS, [0, 1, 0, 0]);   // fasáda
+      // svislé lamely fasády po 3 m (tmavší pásky)
+      const len = Math.hypot(a1 - a0, b1 - b0), n = Math.floor(len / 3);
+      for (let k = 1; k < n; k++) {
+        const t = k / n, x = a0 + (a1 - a0) * t, y = b0 + (b1 - b0) * t, nx = -(b1 - b0) / len, ny = (a1 - a0) / len;
+        pushQuad(X, f(x - nx * 0.05, y - ny * 0.05, g + 3.5), f(x - nx * 0.05 + (a1 - a0) / len * 0.35, y - ny * 0.05 + (b1 - b0) / len * 0.35, g + 3.5),
+          f(x - nx * 0.05 + (a1 - a0) / len * 0.35, y - ny * 0.05 + (b1 - b0) / len * 0.35, g + H0 - 0.5), f(x - nx * 0.05, y - ny * 0.05, g + H0 - 0.5), FAS_D, [0, 1, 0, 0]);
+      }
+      pushQuad(X, f(a0, b0, g + 0.4), f(a1, b1, g + 0.4), f(a1, b1, g + 3.2), f(a0, b0, g + 3.2), C(70, 78, 88), [0.5, 1, 0, 0]);   // prosklený parter
+      pushQuad(R, f(a0, b0, g + H0), f(a1, b1, g + H0), f(c1, d1, g + H1), f(c0, d0, g + H1), ROOF, [0, 0, 1, 0]);             // střecha
+      pushQuad(X, f(c1, d1, g), f(c0, d0, g), f(c0, d0, g + H1), f(c1, d1, g + H1), INNER, [0, 1, 0, 0]);                      // tribuna pod střechou
+    }
+    // lízátka: bod osvětlení vůči středu hřiště (východ, sever) v metrech, změřeno z OSM
+    const MAST = C(58, 62, 68), DISC = C(206, 210, 214), GRID = C(120, 126, 134);
+    for (const [dx, dy] of [[-11.4, -88.9], [69.9, -61.1], [15.5, 73.3], [-62.1, 47.9]]) {
+      const x0 = cx + dx, y0 = cy + dy, d = Math.hypot(dx, dy), ux = -dx / d, uy = -dy / d;   // směr ke středu
+      const top = 52, lean = 9;                                                                // výška terče, náklon vrcholu ke hřišti
+      const N = 8;
+      for (let k = 0; k < N; k++) {                                                            // zužující se nakloněný dřík
+        const t0 = k / N, t1 = (k + 1) / N, r0 = 0.9 - 0.45 * t0, r1 = 0.9 - 0.45 * t1;
+        const p0 = frameAt(x0 + ux * lean * t0, y0 + uy * lean * t0, 0, 0), p1x = x0 + ux * lean * t1, p1y = y0 + uy * lean * t1;
+        ring(X, (s, t, h) => (h < g + top * t1 - 0.01 ? p0(s, t, h) : frameAt(p1x, p1y, 0, 0)(s, t, h)), r0, r1, g + top * t0, g + top * t1, 6, MAST, [0, 1, 0, 0]);
+      }
+      // terč: svislý kruh (průměr 10 m) kolmo ke směru na hřiště, stříbrný s tmavším rastrem, v noci svítí
+      const fx = x0 + ux * lean, fy = y0 + uy * lean, fd = frameAt(fx, fy, 0, Math.atan2(uy, ux));
+      const R0 = 5.0, n = 9;
+      for (let k = 0; k < n; k++) {
+        const v0 = -R0 + 2 * R0 * k / n, v1 = -R0 + 2 * R0 * (k + 1) / n, vm = (v0 + v1) / 2, w = R0 * Math.sqrt(1 - (vm / R0) ** 2);
+        pushBox(X, fd, -0.35, 0.35, -w, w, g + top + v0, g + top + v1, k % 2 ? DISC : GRID, [0.9, 1, 0, 0]);
+      }
+    }
+    return true;
+  },
+
+  // Gymnázium J. K. Tyla (Josef Gočár, 1925–27): cihlová křídla s plochými střechami (kreslí je běžný kód podle dominanty),
+  // uprostřed lomeného průčelí vyšší blok se světlou omítnutou fasádou a mřížkou oken, po stranách dva vysoké cihlové pylony,
+  // v předprostoru bílý sloup se sochou. Poloha: věž 'pt' = vrchol lomeného průčelí (ověřeno na ortofotu ČÚZK).
+  gymnazium_tyl(b, { X, W, R, frameAt, ring, pushBox, pushQuad, pushTri, tv }) {
+    if (!b.tw || !b.tw.length) return false;
+    const ax = b.tw[0].x, ay = b.tw[0].y, g = b.g;
+    const P = ([x, y]) => [ax + x, ay + y];                          // body vůči vrcholu průčelí (východ, sever)
+    const BRICK = C(184, 90, 58), CREAM = C(214, 206, 184), ROOF = C(92, 92, 94);
+    // vyšší střední blok: přední lomená čára průčelí a zadní hrana o 11 m dál
+    const front = [[-16, -11], [-4, -3], [6, -5], [14, -17]], back = [[14, -6], [6, 6], [-4, 8], [-16, 0]];
+    const pts = [...front, ...back].map(P);                          // průčelí na východ, zadní hrana zpět: proti směru hodin
+    const nf = front.length - 1;                                     // stěny 0..nf-1 jsou průčelí (světlá omítka), ostatní cihla
+    prism(W, R, pushQuad, pushTri, tv, g, pts, b.b, g + 22.5, (i) => (i < nf ? CREAM : BRICK), 1, ROOF);
+    // cihlová atika s řadou oken nad světlou fasádou
+    for (let k = 0; k < nf; k++) {
+      const [x0, y0] = P(front[k]), [x1, y1] = P(front[k + 1]);
+      wall(W, pushQuad, tv, g, x0, y0, x1, y1, g + 19.6, g + 22.5, BRICK, 1);
+    }
+    // pylony na koncích světlé fasády
+    for (const [x, y] of [front[0], front[nf]].map(P)) pushBox(X, frameAt(x, y, 0, 0), -2.8, 2.8, -2.8, 2.8, b.b, g + 25.0, BRICK, [0, 1, 1, 0], ROOF);
+    // sokl a schodiště před vchodem
+    const [sx, sy] = P([1, -9]);
+    pushBox(X, frameAt(sx, sy, 0, -0.35), -9, 9, -3.5, 3.5, b.b, g + 0.9, C(176, 172, 164), [0, 1, 1, 0]);
+    // bílý sloup se sochou v předprostoru
+    const [cx, cy] = P([0, -19]), f = frameAt(cx, cy, 0, 0);
+    pushBox(X, f, -1.2, 1.2, -1.2, 1.2, g - 0.2, g + 1.2, C(200, 198, 192), [0, 1, 1, 0]);
+    ring(X, f, 0.45, 0.4, g + 1.2, g + 10.5, 8, C(236, 234, 228), [0, 1, 0, 0]);
+    pushBox(X, f, -0.6, 0.6, -0.6, 0.6, g + 10.5, g + 11.0, C(236, 234, 228), [0, 1, 1, 0]);
+    ring(X, f, 0.35, 0.25, g + 11.0, g + 12.8, 6, C(70, 74, 68), [0, 1, 0, 0]);       // socha (tmavý bronz)
+    pushBox(X, f, -0.08, 0.08, -0.7, 0.7, g + 12.2, g + 12.5, C(70, 74, 68), [0, 1, 0, 0]);
+    return true;
+  },
+
+  // Bílá věž (1574–1589, renesanční zvonice z pískovce, 68,5 m): odstupňovaný hranolový dřík s římsami,
+  // pár obloukových oken na patro, velké černé ciferníky se zlatými číslicemi, ochoz s balustrádou,
+  // nízký osmiboký nástavec, tmavá zvonovitá báně – lucerna – cibulka – jehla se zlatou makovicí.
+  bila_vez(b, { X, R, frameAt, ring, pushBox, GOLDC }) {
+    const { cx, cy, ang } = axis(b.p), g = b.g, f = frameAt(cx, cy, 0, ang);
+    const STONE = C(150, 140, 124), STONE_D = C(126, 118, 106), CORN = C(170, 160, 140);   // zvětralý šedohnědý pískovec
+    const HELM = C(56, 60, 62), WIN = C(44, 46, 52), DIAL = C(28, 28, 30);
+    const solid = [0, 1, 1, 0];
+    // dřík po stupních: [polovina šířky, od, do]; mezi stupni vystupující římsa
+    const stages = [[5.1, -0.8, 19.0], [4.75, 19.0, 37.5], [4.5, 37.5, 46.0]];
+    stages.forEach(([T, z0, z1], k) => {
+      pushBox(X, f, -T, T, -T, T, g + z0, g + z1, k === 0 ? STONE_D : STONE, solid);
+      pushBox(X, f, -T - 0.35, T + 0.35, -T - 0.35, T + 0.35, g + z1 - 0.7, g + z1, CORN, solid);   // římsa
+    });
+    // okna: pár úzkých obloukových oken na každé straně ve vyšších patrech, jedno v přízemí
+    const face = (T, fn) => { for (const [nx, ny] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) fn(nx, ny, T + 0.04); };
+    const win = (T, z0, z1, offs, w = 0.55) => face(T, (nx, ny, d) => {
+      for (const o of offs) {
+        const s = nx ? nx * d : o, t = ny ? ny * d : o;
+        pushBox(X, f, s - (nx ? 0.06 : w), s + (nx ? 0.06 : w), t - (ny ? 0.06 : w), t + (ny ? 0.06 : w), g + z0, g + z1, WIN, [0.35, 1, 0, 0]);
+      }
+    });
+    win(5.1, 9.0, 12.5, [0]);
+    win(4.75, 23.0, 27.0, [-1.6, 1.6]);
+    win(4.75, 30.5, 34.5, [-1.6, 1.6]);
+    // ciferníky (průměr 2,9 m) ve stupni pod ochozem: zlatý kruh a v něm černý, poskládané z vodorovných pásků; v noci svítí
+    const disc = (nx, ny, d, r, zc, col, aw) => {
+      const n = 7;
+      for (let k = 0; k < n; k++) {
+        const v0 = -r + 2 * r * k / n, v1 = -r + 2 * r * (k + 1) / n, vm = (v0 + v1) / 2, w = r * Math.sqrt(1 - (vm / r) ** 2);
+        const s = nx * d, t = ny * d;
+        pushBox(X, f, nx ? s - 0.05 : s - w, nx ? s + 0.05 : s + w, ny ? t - 0.05 : t - w, ny ? t + 0.05 : t + w, zc + v0, zc + v1, col, aw);
+      }
+    };
+    face(4.5, (nx, ny, d) => {
+      disc(nx, ny, d + 0.02, 1.45, g + 41.7, GOLDC, [0.6, 1, 0, 0]);
+      disc(nx, ny, d + 0.08, 1.2, g + 41.7, DIAL, [0.45, 1, 0, 0]);
+    });
+    // ochoz: deska s přesahem a balustráda
+    const G = 5.3, z = g + 46.0;
+    pushBox(X, f, -G, G, -G, G, z, z + 0.45, CORN, solid);
+    for (const [s0, s1, t0, t1] of [[-G, G, -G, -G + 0.25], [-G, G, G - 0.25, G], [-G, -G + 0.25, -G, G], [G - 0.25, G, -G, G]])
+      pushBox(X, f, s0, s1, t0, t1, z + 0.45, z + 1.5, STONE, solid);
+    // čtvercová zvonice nad ochozem: na každé straně tři obloukové otvory (tmavé, v noci prosvítá teplé světlo)
+    const B = 3.9;
+    pushBox(X, f, -B, B, -B, B, z + 0.45, z + 4.6, STONE, solid);
+    face(B, (nx, ny, d) => {
+      for (const o of [-2.2, 0, 2.2]) {
+        const s = nx ? nx * d : o, t = ny ? ny * d : o;
+        pushBox(X, f, s - (nx ? 0.06 : 0.7), s + (nx ? 0.06 : 0.7), t - (ny ? 0.06 : 0.7), t + (ny ? 0.06 : 0.7), z + 1.2, z + 3.9, C(92, 52, 40), [0.5, 1, 0, 0]);
+      }
+    });
+    pushBox(X, f, -B - 0.3, B + 0.3, -B - 0.3, B + 0.3, z + 4.6, z + 5.0, CORN, solid);
+    // zvonovitá báně (prohnutý profil), lucerna, cibulka, jehla
+    const bell = [[4.1, 0.0], [3.5, 1.6], [2.4, 3.2], [1.5, 4.4], [1.15, 5.4]];
+    for (let k = 0; k < bell.length - 1; k++)
+      ring(R, f, bell[k][0], bell[k + 1][0], z + 5.0 + bell[k][1], z + 5.0 + bell[k + 1][1], 8, HELM, [0, 0, 0, 0], Math.PI / 8);
+    const zl = z + 10.4;
+    ring(X, f, 1.05, 1.05, zl, zl + 2.6, 8, HELM, solid, Math.PI / 8);                    // lucerna
+    for (let k = 0; k < 8; k += 2) {
+      const a = Math.PI / 4 + k * Math.PI / 4, r = 1.05 * Math.cos(Math.PI / 8) + 0.03;
+      const ff = frameAt(cx + Math.cos(ang + a) * r, cy + Math.sin(ang + a) * r, 0, ang + a);
+      pushBox(X, ff, -0.06, 0.06, -0.2, 0.2, zl + 0.6, zl + 2.0, C(210, 196, 150), [0.5, 1, 0, 0]);
+    }
+    const onion = [[1.25, 0.0], [1.5, 0.6], [1.25, 1.3], [0.5, 2.0], [0.18, 2.6]];
+    for (let k = 0; k < onion.length - 1; k++)
+      ring(R, f, onion[k][0], onion[k + 1][0], zl + 2.6 + onion[k][1], zl + 2.6 + onion[k + 1][1], 8, HELM, [0, 0, 0, 0], Math.PI / 8);
+    const zs = zl + 5.2;
+    ring(R, f, 0.22, 0, zs, g + 68.5, 8, HELM, [0, 0, 0, 0]);                              // jehla
+    ring(X, f, 0.35, 0.35, g + 66.2, g + 66.9, 8, GOLDC, [0, 1, 0, 0]);                    // makovice
+    pushBox(X, f, -0.07, 0.07, -0.07, 0.07, g + 68.5, g + 71.0, GOLDC, [0, 1, 0, 0]);        // kříž
+    pushBox(X, f, -0.07, 0.07, -0.55, 0.55, g + 70.0, g + 70.2, GOLDC, [0, 1, 0, 0]);
+    return true;
+  },
+};

@@ -50,3 +50,11 @@ output/
 hlaseni/wrangler.jsonc
 wrangler.toml
 !hlaseni/migrations/*.sql
+
+# Hradec Králové: náhledy a referenční fotky dominant (nepatří do gitu)
+preview/
+landmarks_ref/
+
+# Hradec Králové: stažená data magistrátu (../skripty/mmhk_pasport.py)
+assets/mmhk.json
+assets/mmhk_znaceni/

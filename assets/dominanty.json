@@ -1,0 +1,419 @@
+[
+ {
+  "name": "Bílá věž",
+  "lat": 50.209008,
+  "lon": 15.830789,
+  "text": "Renesanční zvonice z let 1574–1589, 68,5 m. Model podle fotek z Wikimedia Commons (landmarks_ref/bila_vez).",
+  "spec": {
+   "lm": "bila_vez",
+   "h": 0.5,
+   "r": "flat",
+   "top": 72
+  }
+ },
+ {
+  "name": "Katedrála svatého Ducha",
+  "lat": 50.20877,
+  "lon": 15.830987,
+  "text": "Gotická cihlová katedrála; dvě hranolové věže s tmavými jehlany stojí po stranách štítu čelem k Velkému náměstí (východ, ověřeno na ortofotu ČÚZK), střecha má zelenou měděnou patinu.",
+  "spec": {
+   "wc": [148, 74, 54],
+   "rc": [100, 132, 118],
+   "r": "gabled",
+   "h": 17,
+   "rh": 15,
+   "win": 4,
+   "towers": [
+    {
+     "at": "front",
+     "side": -8.0,
+     "w": 6.5,
+     "h": 36,
+     "top": "spire",
+     "to": 52,
+     "tc": [66, 72, 74],
+     "wc": [140, 68, 50]
+    },
+    {
+     "at": "front",
+     "side": 8.0,
+     "w": 6.5,
+     "h": 36,
+     "top": "spire",
+     "to": 51,
+     "tc": [66, 72, 74],
+     "wc": [140, 68, 50]
+    }
+   ],
+   "face": [50.2088, 15.8319]
+  }
+ },
+ {
+  "name": "Gymnázium J. K. Tyla",
+  "lat": 50.208595,
+  "lon": 15.82545,
+  "text": "Gočárova budova gymnázia (1925–27): cihlová křídla, uprostřed lomeného průčelí vyšší blok se světlou fasádou mezi dvěma pylony, před ním sloup se sochou. Podle fotek z Wikimedia Commons a ortofota ČÚZK.",
+  "spec": {
+   "lm": "gymnazium_tyl",
+   "wc": [184, 90, 58],
+   "rc": [92, 92, 94],
+   "r": "flat",
+   "h": 16.5,
+   "win": 1,
+   "towers": [
+    {
+     "at": "pt",
+     "w": 1,
+     "h": 1,
+     "top": "none"
+    }
+   ],
+   "top": 25
+  }
+ },
+ {
+  "name": "Hučák – hlavní budova s hodinovou věží",
+  "lat": 50.207136,
+  "lon": 15.825954,
+  "text": "Vodní elektrárna Hučák (F. Sander, 1909–12): cihlová budova s bílými římsami, tmavá mansarda, hodinová věž s bílým štítem a mansardovou bání u jezu. Podle volně licencovaných fotek (pohled z jihu, ze severu a noční) a ortofota ČÚZK.",
+  "spec": {
+   "lm": "hucak_budova",
+   "wc": [184, 90, 62],
+   "rc": [70, 74, 82],
+   "r": "hipped",
+   "h": 11.0,
+   "rh": 5.5,
+   "win": 11,
+   "top": 31,
+   "towers": [
+    {
+     "at": "w",
+     "w": 7.2,
+     "h": 18.5,
+     "top": "none"
+    }
+   ]
+  }
+ },
+ {
+  "name": "Hučák – strojovna",
+  "lat": 50.207519,
+  "lon": 15.826498,
+  "text": "Strojovna Hučáku: hala s velkými půlkruhovými okny do řeky, bílé římsy, lucerny na hřebeni. Podle volně licencovaných fotek (pohled z jihu, ze severu a noční) a ortofota ČÚZK.",
+  "spec": {
+   "lm": "hucak_hala",
+   "wc": [184, 90, 62],
+   "rc": [96, 100, 108],
+   "r": "gabled",
+   "h": 10.0,
+   "rh": 5,
+   "win": 2,
+   "top": 20
+  }
+ },
+ {
+  "name": "Hučák – strojovna (severní)",
+  "lat": 50.207904,
+  "lon": 15.826961,
+  "text": "Strojovna Hučáku: hala s velkými půlkruhovými okny do řeky, bílé římsy, lucerny na hřebeni. Podle volně licencovaných fotek (pohled z jihu, ze severu a noční) a ortofota ČÚZK.",
+  "spec": {
+   "lm": "hucak_hala",
+   "wc": [184, 90, 62],
+   "rc": [96, 100, 108],
+   "r": "gabled",
+   "h": 10.0,
+   "rh": 5,
+   "win": 2,
+   "top": 20
+  }
+ },
+ {
+  "name": "Ulrichovo náměstí – dům s hnědým obkladem",
+  "lat": 50.209964,
+  "lon": 15.821888,
+  "text": "Funkcionalistický dům na jižní straně Ulrichova náměstí: hnědý keramický obklad, pásy oken, ustoupené horní patro, prosklený parter s obchody. Podle fotek z Wikimedia Commons.",
+  "spec": {
+   "wc": [126, 96, 78],
+   "rc": [104, 104, 106],
+   "r": "flat",
+   "h": 20.5,
+   "win": 3
+  }
+ },
+ {
+  "name": "Malšovická aréna",
+  "lat": 50.206419,
+  "lon": 15.845422,
+  "text": "Fotbalový stadion (2023) se čtyřmi stožáry osvětlení – „lízátky“ původního Všesportovního stadionu. Budova v datech chybí, model podle fotek z Wikimedia Commons, ortofota ČÚZK a bodů osvětlení z OSM.",
+  "spec": {
+   "only": 1,
+   "lm": "malsovicka_arena",
+   "h": 52,
+   "cls": "stadion",
+   "w": 120
+  }
+ },
+ {
+  "name": "Zimní stadion",
+  "lat": 50.206596,
+  "lon": 15.829228,
+  "text": "Zimní stadion, Komenského 1214: horní část fasády z mozaiky modrého skla, tmavá markýza a prosklený parter, klenutá střecha. Podle fotek z Wikimedia Commons a ortofota ČÚZK.",
+  "spec": {
+   "lm": "zimni_stadion",
+   "h": 0.5,
+   "r": "flat",
+   "wc": [150, 152, 156],
+   "rc": [150, 152, 156],
+   "top": 18.5
+  }
+ },
+ {
+  "name": "Zimní stadion – hala II",
+  "lat": 50.206752,
+  "lon": 15.831295,
+  "text": "Hala II zimního stadionu s bílou klenutou střechou.",
+  "spec": {
+   "lm": "zimni_hala2",
+   "h": 5.0,
+   "r": "flat",
+   "wc": [214, 196, 150],
+   "rc": [236, 236, 232],
+   "win": 3,
+   "top": 10.5
+  }
+ },
+ {
+  "name": "Jez Hučák",
+  "lat": 50.207213,
+  "lon": 15.825386,
+  "text": "Jez Hučák: dvě jezová pole s přepadem, most se segmentovými oblouky a balustrádou, domek obsluhy na pilíři. Podle volně licencovaných fotek (pohled z jihu, ze severu a noční) a ortofota ČÚZK.",
+  "spec": {
+   "only": 1,
+   "lm": "jez_hucak",
+   "w": 4,
+   "h": 8,
+   "top": 15,
+   "cls": "jez",
+   "probe": {
+    "hore": [50.207343, 15.825538],
+    "dole": [50.207083, 15.825234],
+    "breh_z": [50.207446, 15.824916],
+    "breh_v": [50.207014, 15.825799]
+   }
+  }
+ },
+ {
+  "name": "Terminál HD – střecha v datech",
+  "lat": 50.21665,
+  "lon": 15.812984,
+  "text": "Datová střecha terminálu: kreslí se jen jako nízká dlažba, střechu tvoří model Terminál HD.",
+  "spec": {
+   "h": 0.3,
+   "r": "flat",
+   "rc": [150, 146, 140],
+   "wc": [150, 146, 140]
+  }
+ },
+ {
+  "name": "Terminál HD – hala MHD",
+  "lat": 50.216676,
+  "lon": 15.812451,
+  "text": "Prosklená hala pod střechou terminálu.",
+  "spec": {
+   "h": 4.6,
+   "r": "flat",
+   "wc": [150, 172, 188],
+   "rc": [120, 124, 128],
+   "win": 3
+  }
+ },
+ {
+  "name": "Terminál HD – hala dálkové dopravy",
+  "lat": 50.216619,
+  "lon": 15.813456,
+  "text": "Prosklená hala pod střechou terminálu.",
+  "spec": {
+   "h": 4.6,
+   "r": "flat",
+   "wc": [150, 172, 188],
+   "rc": [120, 124, 128],
+   "win": 3
+  }
+ },
+ {
+  "name": "Terminál HD",
+  "lat": 50.21665,
+  "lon": 15.812984,
+  "text": "Terminál hromadné dopravy (P. Kotas, 2008): bílé membránové střechy, dvě prosklené lodě, stožáry s lany. Podle fotek z Wikimedia Commons a ortofota ČÚZK.",
+  "spec": {
+   "only": 1,
+   "lm": "terminal_hd",
+   "w": 140,
+   "h": 27,
+   "top": 27,
+   "cls": "terminál MHD"
+  }
+ },
+ {
+  "name": "Fontána Koruna",
+  "lat": 50.212061,
+  "lon": 15.812865,
+  "text": "Fontána uprostřed okružní křižovatky Koruna: osm bílých oblouků ve tvaru koruny nad kruhovou nádrží. Podle fotek z Wikimedia Commons a ortofota ČÚZK.",
+  "spec": {
+   "only": 1,
+   "lm": "koruna",
+   "w": 40,
+   "h": 17,
+   "top": 18,
+   "cls": "fontána"
+  }
+ },
+ {
+  "name": "Hlavní nádraží",
+  "lat": 50.214528,
+  "lon": 15.810767,
+  "text": "Funkcionalistická budova hlavního nádraží s hodinovou věží v průčelí k Riegrovu náměstí. Podle fotek z Wikimedia Commons a ortofota ČÚZK.",
+  "spec": {
+   "wc": [226, 220, 200],
+   "rc": [156, 84, 62],
+   "r": "gabled",
+   "h": 13.5,
+   "rh": 6,
+   "win": 8,
+   "face": [50.21434, 15.81174],
+   "towers": [
+    {
+     "at": "front",
+     "side": 0,
+     "w": 8.5,
+     "h": 40,
+     "top": "pyramid",
+     "to": 44,
+     "tc": [96, 142, 122],
+     "wc": [218, 212, 194],
+     "clock": 1
+    }
+   ]
+  }
+ },
+ {
+  "name": "Gayerova kasárna – jižní křídlo",
+  "lat": 50.212165,
+  "lon": 15.833068,
+  "text": "Gayerova kasárna (neorenesanční okrová kasárna s kamennými římsami) a nový parkovací dům. Podle fotek z Wikimedia Commons, ortofota a laseru ČÚZK.",
+  "spec": {
+   "wc": [208, 176, 118],
+   "rc": [132, 86, 66],
+   "r": "hipped",
+   "h": 12.0,
+   "rh": 4.5,
+   "win": 11
+  }
+ },
+ {
+  "name": "Gayerova kasárna – západní křídlo",
+  "lat": 50.21224,
+  "lon": 15.832257,
+  "text": "Gayerova kasárna (neorenesanční okrová kasárna s kamennými římsami) a nový parkovací dům. Podle fotek z Wikimedia Commons, ortofota a laseru ČÚZK.",
+  "spec": {
+   "wc": [208, 176, 118],
+   "rc": [150, 150, 148],
+   "r": "flat",
+   "h": 10.4,
+   "win": 11
+  }
+ },
+ {
+  "name": "Gayerova kasárna – východní křídlo",
+  "lat": 50.212518,
+  "lon": 15.833676,
+  "text": "Gayerova kasárna (neorenesanční okrová kasárna s kamennými římsami) a nový parkovací dům. Podle fotek z Wikimedia Commons, ortofota a laseru ČÚZK.",
+  "spec": {
+   "wc": [208, 176, 118],
+   "rc": [118, 120, 122],
+   "r": "flat",
+   "h": 10.6,
+   "win": 11
+  }
+ },
+ {
+  "name": "Parkovací dům Jana Gayera",
+  "lat": 50.212931,
+  "lon": 15.832695,
+  "text": "Gayerova kasárna (neorenesanční okrová kasárna s kamennými římsami) a nový parkovací dům. Podle fotek z Wikimedia Commons, ortofota a laseru ČÚZK.",
+  "spec": {
+   "wc": [176, 178, 180],
+   "rc": [150, 152, 154],
+   "r": "flat",
+   "h": 7.2,
+   "win": 3
+  }
+ },
+ {
+  "name": "Hotel Černigov",
+  "lat": 50.21439,
+  "lon": 15.813484,
+  "text": "Hotel Černigov (J. Zídka, 70. léta): bílá desková věž ~55 m na nízké podnoži, nejvyšší budova města. V datech jen podnož, věž podle ortofota a fotek z archiweb.cz.",
+  "spec": {
+   "lm": "cernigov",
+   "wc": [228, 226, 220],
+   "rc": [150, 152, 154],
+   "r": "flat",
+   "h": 6.5,
+   "win": 3,
+   "top": 58
+  }
+ },
+ {
+  "name": "Studijní a vědecká knihovna",
+  "lat": 50.205188,
+  "lon": 15.831408,
+  "text": "Studijní a vědecká knihovna (Projektil, 2008): pohledový beton ve tvaru X, rozházená kruhová okna, zlatavé lamely nad vstupem. Podle fotek z archiweb.cz a tzb-info.cz.",
+  "spec": {
+   "lm": "knihovna",
+   "wc": [190, 188, 182],
+   "rc": [150, 150, 148],
+   "r": "flat",
+   "h": 17.4,
+   "win": 2
+  }
+ },
+ {
+  "name": "Městské lázně",
+  "lat": 50.214351,
+  "lon": 15.828813,
+  "text": "Městské lázně (1931–33): bílá funkcionalistická stavba s pásovými okny, hranolová věž s nápisem a prosklená střecha bazénové haly. Podle fotky z aroundus.com a ortofota ČÚZK.",
+  "spec": {
+   "wc": [236, 234, 226],
+   "rc": [176, 190, 198],
+   "r": "flat",
+   "h": 12.0,
+   "win": 3,
+   "towers": [
+    {
+     "at": "n",
+     "w": 9,
+     "h": 16,
+     "top": "pyramid",
+     "to": 16.4,
+     "tc": [230, 228, 222],
+     "wc": [238, 236, 230]
+    }
+   ]
+  }
+ },
+ {
+  "name": "ČSOB – regionální centrála",
+  "lat": 50.216658,
+  "lon": 15.828822,
+  "text": "Regionální centrála ČSOB (Projektil + Roman Brychta, 2021): zaoblená hmota, tmavé sklo mezi bílými pásy podlaží, zelená střecha s atrii. Podle fotek z archiweb.cz a denarchitektury.cz.",
+  "spec": {
+   "lm": "csob",
+   "wc": [58, 66, 78],
+   "rc": [96, 128, 80],
+   "r": "flat",
+   "h": 15.2,
+   "win": 3
+  }
+ }
+]

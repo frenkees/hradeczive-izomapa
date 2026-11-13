@@ -371,7 +371,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     <li><b>Sdílet</b> <span class="ico-inline"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M8 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/><path d="M8 10H5v11h14V10h-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg></span> zkopíruje odkaz přesně na to, co právě vidíte, včetně ročního období a&nbsp;denní doby.</li>
   </ul>
   <p class="muted">Vytvořeno nástrojem <a href="https://github.com/adamklatovsky/izomapa" target="_blank" rel="noopener">izomapa</a> od <a href="https://www.adamklatovsky.cz/" target="_blank" rel="noopener">Adama Klatovského</a> (původní mapa: <a href="https://izomapa.fun" target="_blank" rel="noopener">izometrický Liberec</a>).<br>
-  Mapová data © přispěvatelé <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL) a&nbsp;Overture Maps, terén Terrarium (AWS Open Data), výšky budov a&nbsp;stromů, ortofoto a&nbsp;ZABAGED{{RUIAN_ZDROJ}} © <a href="https://geoportal.cuzk.cz/" target="_blank" rel="noopener">ČÚZK</a> (CC BY 4.0){{MHD_ZDROJ}}{{VITR_ZDROJ}}{{LETADLA_ZDROJ}}{{DOPRAVA_ZDROJ}}.</p>
+  Mapová data © přispěvatelé <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL) a&nbsp;Overture Maps, terén Terrarium (AWS Open Data), výšky budov a&nbsp;stromů, ortofoto a&nbsp;ZABAGED{{RUIAN_ZDROJ}} © <a href="https://geoportal.cuzk.cz/" target="_blank" rel="noopener">ČÚZK</a> (CC BY 4.0){{MHD_ZDROJ}}{{VITR_ZDROJ}}{{LETADLA_ZDROJ}}{{DOPRAVA_ZDROJ}}{{DALSI_ZDROJE}}.</p>
 </dialog>
 <dialog class="help plocha" id="plochaDlg" aria-labelledby="plochaTitle">
   <button class="px-btn close" id="plochaClose" type="button" aria-label="Zavřít">×</button>
@@ -1383,7 +1383,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (!a) { $('followTxt').textContent = 'Spoj dojel do cílové zastávky.'; MHD.follow = null; setTimeout(() => { if (MHD.follow === null) $('follow').hidden = true; }, 4000); return; }
     const t = MHD.trips[i], [line, typ] = MHD.routes[t[0]], z = t[6]; let next = '';
     for (let k = 0; k < z.length; k += 2) if (z[k + 1] >= a[1]) { next = MHD.names[z[k]]; break; }
-    const b = document.createElement('b'); b.textContent = `${typ === 0 ? 'Tramvaj' : typ === 2 ? 'Vlak' : 'Autobus'} ${line}`;
+    const b = document.createElement('b'); b.textContent = `${(typ === 0 ? 'Tramvaj' : typ === 2 ? 'Vlak' : typ === 11 ? 'Trolejbus' : 'Autobus')} ${line}`;
     const odj = a[2] ? ` · stojí na konečné, odjezd za ${Math.max(1, Math.round(a[2] / 60))} min` : next ? ` · další zastávka ${next}` : '';
     $('followTxt').replaceChildren(b, ` → ${MHD.names[t[5]]}`, odj);
   }
@@ -1431,7 +1431,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const za = (dt) => (dt < 60 ? 'teď' : `za ${Math.round(dt / 60)} min`);
     const groups = new Map();
     for (const [dt, t] of stopDepartures(s.n)) {
-      const [line, typ] = MHD.routes[t[0]], key = `${typ === 0 ? 'Tramvaj' : 'Autobus'} ${line} → ${MHD.names[t[5]]}`;
+      const [line, typ] = MHD.routes[t[0]], key = `${(typ === 0 ? 'Tramvaj' : typ === 2 ? 'Vlak' : typ === 11 ? 'Trolejbus' : 'Autobus')} ${line} → ${MHD.names[t[5]]}`;
       if (!groups.has(key)) groups.set(key, []);
       if (groups.get(key).length < 3) groups.get(key).push(dt);
     }
@@ -1523,6 +1523,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     rychlik: { h: 4.1, ...CD, nose: 1.4, cars: [{ len: 18, f: 1, loco: 1, top: 'panto' }, { len: 26.4 }, { len: 26.4 }, { len: 26.4 }] },   // lokomotiva 380 (18 m) a vozy
   };
   const VLAK = {{VLAK}};
+  const MHD_BARVY = {{MHD_BARVY}};
   const trainOf = (line) => TRAINS[VLAK.linky[line]] ? VLAK.linky[line] : TRAINS[VLAK.vychozi] ? VLAK.vychozi : 'regionova';
   // col = "kabina|nástavba|druh" (druh: box = skříň, tarp = plachta)
   function truckFaces(ctx) {
@@ -1714,9 +1715,11 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     } else if (isBus === 3) {
       truckFaces({ R, box, faces, fx_, fy_, sxv, syv, vis, sun, l, w, col, snow });
     } else if (isBus) {                                                     // autobus: bílý, zelený a žlutý pruh, tmavá okna, žluté čelo
-      const WH = [238, 238, 234], GR = [30, 140, 84], YL = [244, 196, 28], GL = [40, 44, 52], DOOR = [54, 58, 66], ROOF = snow || [222, 224, 220];
+      // barvy dopravce: "mhd": {"barvy": {"karoserie", "spodek", "pruh", "celo", "strecha"}} v mesto.json; col 'trol' = trolejbus se sběrači
+      const LV = MHD_BARVY || {}, hx = (q, d) => (typeof q === 'string' && q[0] === '#' ? rgbOf(q) : d);
+      const WH = hx(LV.karoserie, [238, 238, 234]), GR = hx(LV.spodek, [30, 140, 84]), YL = hx(LV.celo, [244, 196, 28]), MID = hx(LV.pruh, YL), GL = [40, 44, 52], DOOR = [54, 58, 66], ROOF = snow || hx(LV.strecha, [222, 224, 220]);
       const ch = 0.45, fp = [[-l + ch, -w], [l - ch, -w], [l, -w + ch], [l, w - ch], [l - ch, w], [-l + ch, w], [-l, w - ch], [-l, -w + ch]];
-      const bands = [[0.3, 0.55, GR], [0.55, 0.95, YL], [0.95, 1.15, WH], [1.15, 2.7, null], [2.7, 3.0, WH]];
+      const bands = [[0.3, 0.55, GR], [0.55, 0.95, MID], [0.95, 1.15, WH], [1.15, 2.7, null], [2.7, 3.0, WH]];
       const Q = (A, B, z0, z1, rgb, d) => faces.push([[R(A[0], A[1], z0), R(B[0], B[1], z0), R(B[0], B[1], z1), R(A[0], A[1], z1)], lit(rgb, d)]);
       for (let i = 0; i < fp.length; i++) {
         const A = fp[i], B = fp[(i + 1) % fp.length], es = B[0] - A[0], et = B[1] - A[1], el = Math.hypot(es, et), ns = et / el, nt = -es / el;
@@ -1744,6 +1747,14 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
       faces.push([ip.map(([s_, t_]) => R(s_, t_, rz + 0.08)), lit(ROOF, sun(0, 0, 1))]);
       box(-l * 0.45, l * 0.55, -0.75, 0.75, rz + 0.08, rz + 0.38, WH, ROOF);   // baterie na střeše
+      if (col === 'trol') {                                                  // trolejbus: dva sběrače šikmo dozadu k trolejím (5,6 m nad vozovkou)
+        const POLE = [40, 42, 46];
+        for (const tt of [-0.45, 0.45]) {
+          const s0 = l * 0.25, s1 = -l * 0.55, h0 = rz + 0.38, h1 = 5.6, d = 0.09;
+          faces.push([[R(s0, tt, h0), R(s1, tt, h1), R(s1, tt, h1 + d * 2), R(s0, tt, h0 + d * 2)], lit(POLE, 0.3)]);
+          faces.push([[R(s0, tt - d, h0 + d), R(s1, tt - d, h1 + d), R(s1, tt + d, h1 + d), R(s0, tt + d, h0 + d)], lit(POLE, 0.6)]);
+        }
+      }
       box(l - 1.1, l - 0.35, -0.95, 0.95, rz, rz + 0.18, YL);                  // žlutá čepice čela
     } else {
       box(-l, l, -w * 0.98, w * 0.98, 0.3, 1.0, c);
@@ -1831,7 +1842,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         if (seen.has(b) || !shown(b.k)) continue; seen.add(b);
         if (b.bb[0] > bb[2] || b.bb[2] < bb[0] || b.bb[1] > bb[3] || b.bb[3] < bb[1]) continue;
         if (b.fb ? !behindFoot(b0[0], b0[1], b.fb) : !((b.dm ?? b.d) < depth(x, y, z) - 1.5)) continue;
-        out.push([3, b.hull]);
+        out.push([4, b.hull]);                                                // 4 = budova: vozidlo za ní zůstane vidět jako průhledná silueta
       }
   }
   function treeShapes(x, y, z, bb) {
@@ -1884,9 +1895,22 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       // Výplň každého dílu zvlášť: překrývající se plochy s opačným pořadím vrcholů se nesmí vzájemně vyrušit.
       occX.fill();
     }
+    // budovy před vozidlem: zakrytou část nevymazat úplně, ale nakreslit jako průhlednou tmavou siluetu (je vidět, kudy jede)
+    const bld = sh.filter((q) => q[0] === 4);
+    if (bld.length) {
+      if (ghC.width < w || ghC.height < h) { ghC.width = Math.max(ghC.width, w); ghC.height = Math.max(ghC.height, h); }
+      ghX.globalCompositeOperation = 'source-over'; ghX.clearRect(0, 0, ghC.width, ghC.height); ghX.drawImage(occC, 0, 0);
+      const path = new Path2D();
+      for (const q of bld) { q[1].forEach((p, k) => { const [px, py] = P(p); k ? path.lineTo(px, py) : path.moveTo(px, py); }); path.closePath(); }
+      ghX.globalCompositeOperation = 'destination-in'; ghX.fill(path, 'nonzero');        // jen část za budovou
+      ghX.globalCompositeOperation = 'source-in'; ghX.fillStyle = GHOST_COL; ghX.fillRect(0, 0, w, h);   // jednobarevná silueta
+      occX.globalCompositeOperation = 'destination-out'; occX.fill(path, 'nonzero');
+    }
     occX.globalCompositeOperation = 'source-over';
     ctx.drawImage(occC, 0, 0, w, h, X0, Y0, w, h);
+    if (bld.length) { const a = ctx.globalAlpha; ctx.globalAlpha = GHOST_A; ctx.drawImage(ghC, 0, 0, w, h, X0, Y0, w, h); ctx.globalAlpha = a; }
   }
+  const ghC = document.createElement('canvas'), ghX = ghC.getContext('2d'), GHOST_COL = '#1b2333', GHOST_A = 0.35;
   // vlak po článcích podle koleje, vzdálenější článek první, aby ho bližší zakryl
   function drawTrain(trip, el, line, sx, ox, oy, night) {
     const name = trainOf(line), cars = TRAINS[name].cars, T = cars.reduce((a, c) => a + c.len + 0.4, -0.4);
@@ -2520,13 +2544,13 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
             o = { ...o, x: x_, y: y_, z: z_, ix: ix_, iy: iy_ };
           }
           if (!vis(o.ix, o.iy, 120) || !cam.grounds.some((q) => Math.abs(o.x - q.cx) <= cam.half && Math.abs(o.y - q.cy) <= cam.half)) continue;   // mimo čtverce mapy
-          const shown_ = typ === 0 ? drawVehicle(o, 15, 2.5, 't3', sx, ox, oy, night, 2) : typ === 2 ? drawTrain(trip, el + (now / 1000 - ns), line, sx, ox, oy, night) : drawVehicle(o, 12, 2.5, '#e9e6dc', sx, ox, oy, night, true);
+          const shown_ = typ === 0 ? drawVehicle(o, 15, 2.5, 't3', sx, ox, oy, night, 2) : typ === 2 ? drawTrain(trip, el + (now / 1000 - ns), line, sx, ox, oy, night) : drawVehicle(o, 12, 2.5, typ === 11 ? 'trol' : 'bus', sx, ox, oy, night, true);
           if (shown_) for (const q of typ === 2 ? drawTrain.pts : [o]) MHD.drawn.push([Math.round(ox + q.ix * sx), Math.round(oy + q.iy * sx) - Math.round(8 * sx), i]);
           if (shown_ && (sx > 0.55 || i === MHD.follow)) {     // číslo linky nad vozidlem
             const h = gz(o.x, o.y), [tx, ty] = toImg(o.x, o.y, h + 6), X_ = Math.round(ox + tx * sx), Y_ = Math.round(oy + ty * sx);
             ctx.font = '700 13px "Atkinson Hyperlegible", system-ui, sans-serif'; const tw = Math.ceil(ctx.measureText(line).width) + 10;
             ctx.fillStyle = '#16191f'; ctx.fillRect(X_ - tw / 2 - 1, Y_ - 10, tw + 2, 19);
-            ctx.fillStyle = typ === 0 ? '#c4352b' : typ === 2 ? '#2f7d4f' : '#1f6fb2'; ctx.fillRect(X_ - tw / 2, Y_ - 9, tw, 17);
+            ctx.fillStyle = typ === 0 ? '#c4352b' : typ === 2 ? '#2f7d4f' : typ === 11 ? '#7b3fa0' : '#1f6fb2'; ctx.fillRect(X_ - tw / 2, Y_ - 9, tw, 17);
             if (i === MHD.follow) { ctx.strokeStyle = '#f2c66d'; ctx.lineWidth = 2; ctx.strokeRect(X_ - tw / 2 - 2, Y_ - 11, tw + 4, 21); }
             ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(line, X_, Y_); ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
           }
@@ -2535,7 +2559,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       if (bus && !MHD.on) {
         stepShuttle(bus, dt, 4, 6);
         const o = along(bus.r, bus.s); o.dirSign = bus.dir;
-        if (sx > 0.12 && vis(o.ix, o.iy, 80)) drawVehicle(o, 12, 2.5, '#e9e6dc', sx, ox, oy, night, true);
+        if (sx > 0.12 && vis(o.ix, o.iy, 80)) drawVehicle(o, 12, 2.5, 'bus', sx, ox, oy, night, true);
       }
       for (const tr of MHD.on ? [] : trams) {
         stepShuttle(tr, dt, 5, 12);

@@ -1,88 +1,161 @@
 """Trasa autobusu mezi zastávkami po silnicích z dat mapy (pro GTFS bez shapes.txt, např. IDS JMK).
 
 Graf = vrcholy segmentů Overture (subtype road, jen sjízdné třídy), zhuštěné po 20 m; uzly se slévají podle souřadnic
-zaokrouhlených na 0,5 m. Zastávka se přichytí k nejbližšímu uzlu do 80 m. Zastávka mimo mapu: po silnici k uzlu nejblíž k ní (okraj mapy),
-dál rovně (to už prohlížeč nekreslí). Bez cesty vede úsek rovně.
+zaokrouhlených na 0,5 m. Jednosměrky (access_restrictions, bez výjimky pro autobusy) jsou orientované hrany, takže
+na rozdělené silnici (dva pásy) jede autobus po pásu ve svém směru. Zastávka má několik kandidátních uzlů do 80 m
+(oba pásy, obě strany křižovatky); vybere se ta posloupnost, která dá nejkratší jízdu (Viterbi přes zastávky).
+Zastávka mimo mapu: po silnici k uzlu nejblíž k ní (okraj mapy), dál rovně (to už prohlížeč nekreslí).
+Když po jednosměrkách cesta není (chyba v datech), zkusí se bez nich; bez cesty vede úsek rovně.
 """
 import heapq
 import numpy as np
 import pyarrow.parquet as pq
 import shapely
+import shapely.ops
 from shapely.ops import transform
 from geo import to_local
 
 COST = {'motorway': 1.0, 'trunk': 1.0, 'primary': 1.0, 'secondary': 1.0, 'tertiary': 1.0,
         'unclassified': 1.2, 'residential': 1.2, 'living_street': 1.5, 'service': 2.0, 'unknown': 1.5}
 SNAP = 80.0
+CAND = 30.0          # kandidáti zastávky: uzly nejvýš o tolik dál než nejbližší
+SNAP_W = 3.0         # cena za metr od zastávky k uzlu (ať se nevybere vzdálená silnice jen kvůli kratší trase)
+BUS = {'bus', 'psv', 'trolleybus', 'hgv', 'motor_vehicle', 'vehicle'}
+
+
+def _none(v):
+    return v is None or (not isinstance(v, str) and hasattr(v, '__len__') and len(v) == 0)
+
+
+def oneway(acc):
+    """+1 = jen ve směru geometrie, -1 = jen proti, 0 = obousměrná (pro autobus: výjimka pro bus/psv ruší jednosměrku)"""
+    if _none(acc): return 0
+    if any(a.get('access_type') == 'allowed' and set((a.get('when') or {}).get('mode') or []) & {'bus', 'psv', 'trolleybus'} for a in acc):
+        return 0
+    for a in acc:
+        w = a.get('when') or {}
+        if a.get('access_type') == 'denied' and _none(a.get('between')) and _none(w.get('mode')) and _none(w.get('using')) and _none(w.get('recognized')):
+            if w.get('heading') == 'backward': return 1
+            if w.get('heading') == 'forward': return -1
+    return 0
 
 
 class Graph:
     def __init__(self, parquet):
-        t = pq.read_table(parquet, columns=['subtype', 'class', 'geometry']).to_pylist()
-        self.xy, self.idx, self.adj = [], {}, []
+        t = pq.read_table(parquet, columns=['subtype', 'class', 'geometry', 'access_restrictions']).to_pylist()
+        self.xy, self.idx, self.adj, self.adj_u = [], {}, [], []
+        rows = []
         for r in t:
             c = COST.get(r['class'])
             if r['subtype'] != 'road' or c is None: continue
-            g = transform(lambda x, y, z=None: to_local(x, y), shapely.from_wkb(r['geometry'])).segmentize(20.0)
-            for ls in getattr(g, 'geoms', [g]):
-                ids = [self.node(p) for p in ls.coords]
-                for a, b in zip(ids, ids[1:]):
-                    if a == b: continue
-                    w = c * float(np.hypot(*np.subtract(self.xy[a], self.xy[b])))
-                    self.adj[a].append((b, w)); self.adj[b].append((a, w))
+            g = transform(lambda x, y, z=None: to_local(x, y), shapely.from_wkb(r['geometry']))
+            for ls in getattr(g, 'geoms', [g]): rows.append((ls, c, oneway(r['access_restrictions']), r['class']))
+        # kruhové objezdy data často jednosměrné nemají (stejné pravidlo jako v prep.py): malý kruhový prstenec krátkých
+        # úseků, doprava proti směru hodinových ručiček
+        short = [ls for ls, _c, _o, k in rows if ls.length < 60 and k != 'service']
+        rings = [shapely.geometry.polygon.orient(q, 1.0).exterior for q in shapely.ops.polygonize(shapely.ops.unary_union(short) if short else [])
+                 if q.length < 250 and 4 * np.pi * q.area / q.length ** 2 > 0.85 and len(q.exterior.coords) >= 8]
+        for k, (ls, c, o, cl) in enumerate(rows):
+            if o or ls.length >= 60 or cl == 'service': continue
+            for ring in rings:
+                if all(ring.distance(shapely.Point(q)) < 0.5 for q in (ls.coords[0], ls.interpolate(0.5, normalized=True).coords[0], ls.coords[-1])):
+                    a_, b_ = ring.project(ls.interpolate(0.25, normalized=True)), ring.project(ls.interpolate(0.75, normalized=True))
+                    rows[k] = (ls, c, 1 if b_ >= a_ else -1, cl); break
+        for ls, c, o, _cl in rows:
+            ls = ls.segmentize(20.0)
+            ids = [self.node(p) for p in ls.coords]
+            for a, b in zip(ids, ids[1:]):
+                if a == b: continue
+                w = c * float(np.hypot(*np.subtract(self.xy[a], self.xy[b])))
+                if o >= 0: self.adj[a].append((b, w))
+                if o <= 0: self.adj[b].append((a, w))
+                self.adj_u[a].append((b, w)); self.adj_u[b].append((a, w))
         self.arr = np.array(self.xy) if self.xy else np.zeros((0, 2))
-        self.cache, self.fails = {}, 0
+        self.fails = self.undirected = 0
+        self.n_rings = len(rings)
 
     def node(self, p):
         k = (round(p[0] * 2), round(p[1] * 2))
         if k not in self.idx:
-            self.idx[k] = len(self.xy); self.xy.append((float(p[0]), float(p[1]))); self.adj.append([])
+            self.idx[k] = len(self.xy); self.xy.append((float(p[0]), float(p[1]))); self.adj.append([]); self.adj_u.append([])
         return self.idx[k]
 
-    def snap(self, p, far=False):
-        """nejbližší uzel do SNAP m; far=True: i dál (zastávka mimo mapu -> silnice na okraji mapy směrem k ní)"""
-        if not len(self.arr): return None
+    def cands(self, p, far=False):
+        """{uzel: vzdálenost} kandidátů zastávky do SNAP m (far=True: aspoň nejbližší uzel, i když je dál)"""
+        if not len(self.arr): return {}
         d = np.hypot(self.arr[:, 0] - p[0], self.arr[:, 1] - p[1]); i = int(d.argmin())
-        return i if far or d[i] <= SNAP else None
+        if d[i] > SNAP: return {i: float(d[i])} if far else {}
+        ok = np.flatnonzero(d <= min(SNAP, d[i] + CAND))
+        ok = ok[np.argsort(d[ok])][:60]
+        return {int(k): float(d[k]) for k in ok}
 
-    def leg(self, a, b):
-        """body cesty z a do b (bez a), nebo None"""
-        if (a, b) in self.cache: return self.cache[(a, b)]
-        dist, prev, q = {a: 0.0}, {}, [(0.0, a)]
-        lim = 4 * float(np.hypot(*np.subtract(self.xy[a], self.xy[b]))) + 500   # objížďka nejvýš ~4×
-        while q:
+    def _leg(self, src, dst, adj):
+        """Dijkstra z více zdrojů {uzel: počáteční cena} do kandidátů dst; vrátí (ceny dst, předchůdci)"""
+        dist, prev, q = dict(src), {}, [(c, u) for u, c in src.items()]
+        heapq.heapify(q)
+        a0 = np.mean([self.xy[u] for u in src], axis=0); b0 = np.mean([self.xy[u] for u in dst], axis=0)
+        lim = min(src.values()) + 4 * float(np.hypot(*(a0 - b0))) + 500   # objížďka nejvýš ~4×
+        left = set(dst)
+        while q and left:
             d, u = heapq.heappop(q)
-            if u == b: break
-            if d > dist.get(u, 1e18) or d > lim: continue
-            for v, w in self.adj[u]:
+            if d > dist.get(u, 1e18): continue
+            if d > lim: break
+            left.discard(u)
+            for v, w in adj[u]:
                 if d + w < dist.get(v, 1e18): dist[v] = d + w; prev[v] = u; heapq.heappush(q, (d + w, v))
-        res = None
-        if b in prev or a == b:
-            res, u = [], b
-            while u != a: res.append(self.xy[u]); u = prev[u]
-            res.reverse()
-        self.cache[(a, b)] = res
-        return res
+        return {u: dist[u] for u in dst if u not in left}, prev
 
     def path(self, stops):
         """lomená čára přes zastávky [(x, y)] a vzdálenost každé zastávky po ní"""
-        near = [self.snap(p) for p in stops]
-        nodes = [n if n is not None or not any(q is not None for q in near[max(i - 1, 0):i + 2]) else self.snap(stops[i], True)
-                 for i, n in enumerate(near)]
+        near = [self.cands(p) for p in stops]
+        cand = [c if c or not any(q for q in near[max(i - 1, 0):i + 2]) else self.cands(stops[i], True)
+                for i, c in enumerate(near)]
+        # Viterbi: pro každou zastávku ceny dosažených kandidátů a zpětné ukazatele (předchůdci z Dijkstry daného úseku)
+        legs = []                                           # [(best {uzel: cena}, prev, src)] pro úseky 1..n-1
+        best = {u: SNAP_W * d for u, d in cand[0].items()}
+        bests = [best]
+        for i in range(1, len(stops)):
+            dst = cand[i]
+            if not best or not dst:
+                legs.append(None); best = {u: SNAP_W * d for u, d in dst.items()}; bests.append(best)
+                if best and near[i - 1] and near[i]: self.fails += 1
+                continue
+            got, prev = self._leg(best, dst, self.adj)
+            if not got:
+                got, prev = self._leg(best, dst, self.adj_u)
+                if got: self.undirected += 1
+            if not got:
+                if near[i - 1] and near[i]: self.fails += 1
+                legs.append(None); best = {u: SNAP_W * d for u, d in dst.items()}; bests.append(best)
+                continue
+            legs.append((prev, set(best)))
+            best = {u: c + SNAP_W * dst[u] for u, c in got.items()}; bests.append(best)
+        # zpětný průchod: zvolené uzly zastávek a body úseků
+        chosen = [None] * len(stops); pts = [None] * len(stops)
+        u = min(best, key=best.get) if best else None
+        for i in range(len(stops) - 1, 0, -1):
+            chosen[i] = u
+            lg = legs[i - 1]
+            if lg is None or u is None:
+                b_ = bests[i - 1]                          # úsek bez cesty: předchozí zastávka podle svého nejlepšího kandidáta
+                u = min(b_, key=b_.get) if b_ else None
+                continue
+            prev, src = lg; seq = [u]
+            while seq[-1] not in src: seq.append(prev[seq[-1]])
+            seq.reverse(); pts[i] = seq; u = seq[0]
+        chosen[0] = u
         line, dists, L = [tuple(stops[0])], [0.0], 0.0
+
         def add(p):
             nonlocal L
             L += float(np.hypot(p[0] - line[-1][0], p[1] - line[-1][1])); line.append(tuple(p))
         for i in range(1, len(stops)):
-            a, b = nodes[i - 1], nodes[i]
-            pts = self.leg(a, b) if a is not None and b is not None else None
-            if pts is None:
-                if near[i - 1] is not None and near[i] is not None: self.fails += 1
+            if pts[i] is None:
                 add(stops[i])
             else:
-                if len(line) == 1 or line[-1] != self.xy[a]: add(self.xy[a])
-                for p in pts: add(p)
-                if near[i] is None: add(stops[i])                # dál mimo mapu rovně
+                for k in pts[i]:
+                    if line[-1] != self.xy[k]: add(self.xy[k])
+                if not near[i]: add(stops[i])               # dál mimo mapu rovně
             dists.append(L)
         if len(line) < 2: line.append((line[0][0] + 0.1, line[0][1]))
         return line, dists

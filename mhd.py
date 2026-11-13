@@ -82,7 +82,7 @@ if 'shapes.txt' not in zf.namelist():                      # GTFS bez tvarů tra
             shapes.append([[round(a, 1), round(b, 1)] for a, b in shapely.simplify(shapely.LineString(line), 1.0).coords])
         t['shape_id'], dists = syn[key]
         st[t['trip_id']] = [(q, a_, d_, dist, z) for (q, a_, d_, _, z), dist in zip(s, dists)]
-    print('trasy dopočítané po silnicích:', len(shapes), 'úseků bez silnice:', R.fails)
+    print('trasy dopočítané po silnicích:', len(shapes), 'úseků bez silnice:', R.fails, 'úseků jen bez ohledu na jednosměrky:', R.undirected, 'kruhových objezdů:', R.n_rings)
 TI = {t['trip_id'] for t in trips}; SV = {t['service_id'] for t in trips}
 st = {k: [(q, a_, d_, dist, SN.get(z, '')) for q, a_, d_, dist, z in v] for k, v in st.items() if k in TI}
 routes, RI = [], {}

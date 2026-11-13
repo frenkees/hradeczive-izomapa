@@ -1220,7 +1220,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       else if (c.t === 'semi') { c.col = CABC[i % CABC.length]; c.col2 = BOXC[(i >> 3) % BOXC.length]; }
       else if (c.t === 'garbage') c.col = '#ecebe6|#e8742a';
       else if (c.t === 'tractor') c.col = rnd(i + 17) < 0.7 ? '#3f7a2e' : '#b52a1e';
-      c.T = VTYP[c.t]; c.pr = -1;
+      c.T = VTYP[c.t]; c.pr = -1; c.lj = rnd(i + 19);
       if (c.dir < 0) c.s = roads[c.r].L - c.s;
       cars.push(c);
     }
@@ -1284,7 +1284,21 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const L = Math.hypot(o.dx, o.dy) || 1, x = o.x + o.dy / L * side * off, y = o.y - o.dx / L * side * off, h = o.z ?? gz(x, y), [ix, iy] = toImg(x, y, h);
     return { x, y, ix, iy, d: depth(x, y, h) };
   };
+  // pruh: odsazení vpravo od osy kusu ve směru jízdy (m). r.ln = [pruhů po směru kusu, proti] z OSM (nastroje/pruhy.py);
+  // bez něj jednosměrka = jeden pruh uprostřed, obousměrná = jeden pruh v každém směru. Víc pruhů jedním směrem
+  // (městský okruh, rozdělená silnice): auta jedou vedle sebe, nákladní a pomalá vozidla vpravo.
+  const LANE_W = 3.2;
+  function laneOff(c, r, dir) {
+    const mine = r.ln ? (dir > 0 ? r.ln[0] : r.ln[1]) : 1, other = r.ln ? (dir > 0 ? r.ln[1] : r.ln[0]) : (r.o ? 0 : 1), n = Math.max(1, mine);
+    const j = c.truck || c.t === 'tractor' || c.t === 'garbage' ? n - 1 : Math.min(n - 1, Math.floor((c.lj ?? 0.5) * n));   // 0 = nejlevější pruh
+    return other ? LANE_W / 2 + j * LANE_W : (j - (n - 1) / 2) * LANE_W;
+  }
   function stepCar(c, dt) {
+    stepCarMove(c, dt);
+    const t = laneOff(c, roads[c.r], c.dir);                // přejetí do jiného pruhu plynule (~2 s), ne skokem
+    c.lo = c.lo === undefined || c.pr < 0 && Math.abs(t - c.lo) > 6 ? t : c.lo + Math.max(-1.8 * dt, Math.min(1.8 * dt, t - c.lo));
+  }
+  function stepCarMove(c, dt) {
     if (c.hold) { if (blocked(c.hold)) return; c.hold.q = null; c.hold = null; }
     const r = roads[c.r], next = c.s + carSpeed(c, r) * dt * c.dir;
     if (r.jy.length) for (const z of r.jy) {                // zavřený přejezd nebo plný kruhový objezd: zastavit 6 m před, další auta ve frontě
@@ -1311,9 +1325,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   }
   function trailerPos(c) {                                  // návěs kamionu TAH m za tahačem, po předchozí silnici, když tahač právě odbočil
     const r = roads[c.r], done = c.dir > 0 ? c.s : r.L - c.s;
-    if (done >= TAH || c.pr < 0) { const o = along(r, Math.max(0, Math.min(r.L, c.s - TAH * c.dir))); o.dirSign = c.dir; o.lane = r.o ? 0 : 1.6; return o; }
+    if (done >= TAH || c.pr < 0) { const o = along(r, Math.max(0, Math.min(r.L, c.s - TAH * c.dir))); o.dirSign = c.dir; o.lane = c.lo ?? laneOff(c, r, c.dir); return o; }
     const q = roads[c.pr], rem = Math.min(q.L, TAH - done);
-    const o = along(q, c.pdir > 0 ? q.L - rem : rem); o.dirSign = c.pdir; o.lane = q.o ? 0 : 1.6; return o;
+    const o = along(q, c.pdir > 0 ? q.L - rem : rem); o.dirSign = c.pdir; o.lane = c.lo ?? laneOff(c, q, c.pdir); return o;
   }
   const bus = (() => {
     if (!OV.bus) return null;
@@ -2518,7 +2532,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
       if (sx > 0.12) for (const c of cars) {
         if (!carActive(c) || !shown(roads[c.r].k)) continue;
-        const o = along(roads[c.r], c.s); o.dirSign = c.dir; o.lane = roads[c.r].o ? 0 : 1.6;
+        const o = along(roads[c.r], c.s); o.dirSign = c.dir; o.lane = c.lo ?? laneOff(c, roads[c.r], c.dir);
         if (!vis(o.ix, o.iy)) continue;
         if (c.t !== 'semi') { drawVehicle(o, c.T.len, c.T.wid, c.col, sx, ox, oy, night, c.T.code); continue; }
         const q = trailerPos(c), nav = () => drawVehicle(q, TRAILER, 2.55, c.col2, sx, ox, oy, night, 8, 2);   // kamion: vzdálenější díl dřív

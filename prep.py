@@ -1957,6 +1957,27 @@ def piece_oneway(l):
         src, o = _ow2[k]
         if src.distance(m_) < 0.5: return o * _along(src, l)
     return 0
+# počet pruhů z OSM (nastroje/pruhy.py): [po směru kusu, proti směru], jen když je v některém směru víc než jeden pruh
+_ln, _ln_tree = [], None
+if os.path.exists('assets/pruhy.json'):
+    for q in json.load(open('assets/pruhy.json')):
+        x_, y_ = to_local([p_[1] for p_ in q['g']], [p_[0] for p_ in q['g']])
+        _ln.append((LineString(list(zip(x_, y_))), q['f'], q['b']))
+    _ln_tree = shapely.STRtree([l for l, _f, _b in _ln]) if _ln else None
+def piece_lanes(l):
+    if _ln_tree is None or l.length < 1: return None
+    m_ = l.interpolate(0.5, normalized=True)
+    a_, b_ = l.interpolate(max(0, l.length / 2 - 2)), l.interpolate(min(l.length, l.length / 2 + 2))
+    dx, dy = b_.x - a_.x, b_.y - a_.y; d_ = math.hypot(dx, dy) or 1
+    best = None
+    for k in _ln_tree.query(m_.buffer(4.0)):
+        src, f_, b2 = _ln[k]; dd = src.distance(m_)
+        if dd > 4.0: continue
+        s_ = src.project(m_); p0, p1 = src.interpolate(max(0, s_ - 2)), src.interpolate(min(src.length, s_ + 2))
+        ex, ey = p1.x - p0.x, p1.y - p0.y; cs = (dx * ex + dy * ey) / (d_ * (math.hypot(ex, ey) or 1))
+        if abs(cs) < 0.85: continue                # křížící se cesta
+        if best is None or dd < best[0]: best = (dd, [f_, b2] if cs > 0 else [b2, f_])
+    return best[1] if best else None
 # rychlostní limity z dat (km/h): jen trvalé, bez podmínek
 def _limit(r):
     sl = r.get('speed_limits')
@@ -1979,6 +2000,10 @@ def _road(p3, l, c, n):
     if d_: o['o'] = d_
     lim = piece_limit(l)
     if lim: o['l'] = lim
+    n_ = piece_lanes(l)
+    if n_ and c != 'service':
+        if d_: n_ = [n_[0], 0] if d_ > 0 else [0, n_[1]]       # jednosměrka: platí jen pruhy ve směru jízdy
+        if max(n_) > 1: o['ln'] = n_                # 'n' je název ulice
     if _v_tree is not None and c != 'service':
         v_, t_, lk_ = piece_intensity(l, c)
         o['v'] = int(v_ or _V_CLASS.get(c, 300))

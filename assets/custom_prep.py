@@ -45,10 +45,55 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             _g = _g.intersection(_MM_PIL)
             return None if _g.is_empty or _g.area < 0.3 else _g
 
-        _MM_POV = [(p, r) for r in _MMHK['povrchy'] if (p := _mm_poly(r)) is not None]
-        _MM_ZEL = [(p, r) for r in _MMHK['zelen'] if (p := _mm_poly(r)) is not None]
-        _MM_PZ = [p for r in _MMHK['parky'] if (p := _mm_poly(r)) is not None]
-        _MM_PARK = [p for r in _MMHK['parkoviste'] if (p := _mm_poly(r)) is not None]
+        # přestavby, které pasport ještě nemá (assets/prestavby.json, OSM z ../skripty/prestavby_osm.py): v zóně se pasport
+        # komunikací, zeleně, značení, stání a zábradlí nepoužije a vozovky, chodníky a přechody se nakreslí podle OSM
+        _PRE = json.load(open('assets/prestavby.json', encoding='utf-8')) if os.path.exists('assets/prestavby.json') else []
+        _PRE_Z = shapely.unary_union([Polygon(_mm_xy(p['zona'])) for p in _PRE]).buffer(0) if _PRE else Polygon()
+        _PRE_ZP = shapely.prepared.prep(_PRE_Z)
+
+        def _mm_cut(g):
+            if g is None or _PRE_Z.is_empty or not g.intersects(_PRE_Z): return g
+            g = g.difference(_PRE_Z)
+            return None if g.is_empty or g.area < 0.3 else g
+
+        _MM_POV = [(p, r) for r in _MMHK['povrchy'] if (p := _mm_cut(_mm_poly(r))) is not None]
+        _MM_ZEL = [(p, r) for r in _MMHK['zelen'] if (p := _mm_cut(_mm_poly(r))) is not None]
+        _MM_PZ = [p for r in _MMHK['parky'] if (p := _mm_cut(_mm_poly(r))) is not None]
+        _MM_PARK = [p for r in _MMHK['parkoviste'] if (p := _mm_cut(_mm_poly(r))) is not None]
+
+        # cesty z OSM v zónách přestaveb: (geometrie, druh plochy, šířka, tagy); podchody a stavby se nekreslí
+        _PRE_CAR = {'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'trunk', 'trunk_link',
+                    'residential', 'unclassified', 'living_street', 'service'}
+        _PRE_W = []
+        for _p in _PRE:
+            for _w in _p.get('osm', {}).get('ways', []):
+                _t = _w['t']; _h = _t.get('highway')
+                if 'area:highway' in _t or not _h: continue
+                if _t.get('tunnel') or _t.get('covered') == 'yes' or _t.get('layer', '0').startswith('-'): continue
+                if _h in ('proposed', 'construction', 'platform', 'corridor', 'elevator'): continue
+                _l = LineString(_mm_xy(_w['q']))
+                if not _l.intersects(_PRE_Z.buffer(30)): continue
+                _ow = _t.get('oneway') == 'yes' or _t.get('junction') == 'roundabout'
+                _ln = _t.get('lanes', ''); _n = int(_ln) if _ln.isdigit() else 0
+                try: _wd = float(_t.get('width', '').replace(',', '.').split()[0])
+                except (ValueError, IndexError): _wd = 0.0
+                if _h in _PRE_CAR:
+                    if _h == 'service':
+                        _n = _n or 1; _wd = _wd or (3.0 if _t.get('service') in ('driveway', 'parking_aisle') else 3.6)
+                    elif _h.endswith('_link'):
+                        _n = _n or 1; _wd = _wd or _n * 3.5 + 0.8
+                    elif _h in ('residential', 'unclassified', 'living_street'):
+                        _n = _n or (1 if _ow else 2); _wd = _wd or (_n * 3.0 + 0.5 if _ow else max(6.0, _n * 3.0))
+                    else:
+                        _n = _n or (1 if _ow else 2); _wd = _wd or _n * 3.3 + 0.6
+                    _PRE_W.append((_l, 'road', _wd, _t, _n, _ow))
+                else:
+                    _wd = _wd or {'cycleway': 3.0, 'footway': 2.2, 'path': 2.0, 'steps': 2.5, 'pedestrian': 4.0, 'track': 3.0}.get(_h, 2.0)
+                    _PRE_W.append((_l, 'paved' if _h == 'steps' else 'dirt' if _h == 'track' else 'footway', min(_wd, 5.0), _t, 0, False))
+        _PRE_ROADS = shapely.unary_union([l.buffer(w / 2, cap_style='flat') for l, k, w, *_ in _PRE_W if k == 'road']) if _PRE_W else Polygon()
+        _PRE_ALL = shapely.prepared.prep(shapely.unary_union([l.buffer(w / 2 + 1.0) for l, k, w, *_ in _PRE_W]).intersection(_PRE_Z)) if _PRE_W else None
+        _PRE_ISL = [Polygon(_mm_xy(_w['q'])).buffer(0) for _p in _PRE for _w in _p.get('osm', {}).get('ways', [])
+                    if _w['t'].get('area:highway') and len(_w['q']) >= 4]
         _KERE = ('Zapojené skupiny keřů', 'Pokryvné výsadby keřů', 'Rozvolněné skupiny keřů', 'Živé ploty', 'Skupiny keřů')
         _wat = load('water')
         _MM_W = shapely.unary_union([g for c, g in zip(_wat['class'], _wat.geom) if c in ('river', 'water', 'canal', 'moat')
@@ -100,6 +145,7 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
         _xy = _mm_xy([[t['lat'], t['lon']] for t in _st]) if _st else np.zeros((0, 2))
         for t, (x, y) in zip(_st, _xy):
             if not _MM_PILP.contains(Point(x, y)): continue
+            if _PRE_ALL is not None and _PRE_ALL.contains(Point(x, y)): continue     # strom z pasportu na nové silnici/chodníku
             _ker = 'keře' in t['druh']; _con = 1 if 'jehli' in t['druh'] else 0; _h = t.get('h')
             if _ker:
                 _h = _h if _h and _h <= 4.5 else 1.6 + h01('k' + wkey(x, y)) * 1.4
@@ -224,6 +270,7 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             for ring in [p.exterior, *p.interiors]: dr.line(_pp(ring.coords), fill=1, width=1)
         S[np.asarray(cm, bool) & _mask(_MM_PIL.buffer(-1.0))] = C['curb']
         # 5) vodorovné značení z městské WMS (dlaždice 0,1 m/px, max 3×3 -> 0,3 m), jen na zpevněných plochách
+        _ZON = _mask(_PRE_Z.intersection(_MM_PIL)) if not _PRE_Z.is_empty else None
         import scipy.ndimage as _ndi
         from pyproj import Transformer as _Tr
         _zi = json.load(open('assets/mmhk_znaceni/index.json')); _ZR, _ZT = _zi['res'], _zi['tile']; _ZM = _ZR * _ZT
@@ -247,7 +294,70 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
                 rr = np.clip(((key[1] + 1) * _ZM - KY_[s_]) / _ZR, 0, _ZT - 1).astype(np.int64)
                 hit[s_] = _ztc[key][rr, cc]
             hit = hit.reshape(GX.shape) & PAVED[rb:rb + GX.shape[0]]
+            if not _PRE_Z.is_empty: hit &= ~_ZON[rb:rb + GX.shape[0]]
             S[rb:rb + GX.shape[0]][hit] = C['marking']
+        # 5a) zóny přestaveb: povrchy podle OSM (pasport je tu ze stavu před přestavbou)
+        if _ZON is not None and _ZON.any():
+            _ROADISH = np.isin(S, ROADISH + [C['construction'], C['dirt']])
+            S[_ZON & _ROADISH] = C['grass']                      # cesty z Overture (odhad šířky) a staré plochy pryč
+
+            def _plines(geoms, k, wpx=1):                       # tenké čáry (značení) přímo do rastru
+                m_ = Image.new('L', (S.shape[1], S.shape[0]), 0); d_ = ImageDraw.Draw(m_)
+                for g_ in geoms:
+                    for l_ in lines(g_): d_.line(_pp(l_.coords), fill=1, width=wpx)
+                S[np.asarray(m_, bool) & _ZON] = C[k]
+
+            def _zpaint(g_, k):
+                g_ = g_.intersection(_PRE_Z)
+                if g_.is_empty: return
+                m_ = _mask(g_); S[m_ & _ZON] = C[k]
+            for k_ in ('dirt', 'footway', 'paved'):
+                _g = [l.buffer(w / 2, cap_style='round') for l, kk, w, *_ in _PRE_W if kk == k_]
+                if _g: _zpaint(shapely.unary_union(_g), k_)
+            _rd = [l.buffer(w / 2, cap_style='flat', join_style='round') for l, kk, w, *_ in _PRE_W if kk == 'road']
+            # spoje: kruh na koncích, aby se navazující kusy a ramena křižovatek plynule spojily
+            _rd += [Point(q).buffer(w / 2) for l, kk, w, *_ in _PRE_W if kk == 'road' for q in (l.coords[0], l.coords[-1])]
+            _RU = shapely.unary_union(_rd).buffer(0.4).buffer(-0.4)
+            _zpaint(_RU.buffer(0.35), 'curb'); _zpaint(_RU, 'road')
+            for _i in _PRE_ISL:                                   # dělicí ostrůvky s obrubou: velké travnaté, malé dlážděné
+                _zpaint(_i.buffer(0.3), 'curb'); _zpaint(_i, 'grass' if _i.area > 40 else 'paved')
+            # značení: dělicí čáry pruhů (přerušované 3 m / 6 m), na obousměrné silnici střední čára
+            _mk = []
+            for l, kk, w, t_, n_, ow in _PRE_W:
+                if kk != 'road' or t_.get('highway') == 'service': continue
+                if ow and n_ >= 2:
+                    offs = [(-w / 2 + 0.3) + (w - 0.6) * i / n_ for i in range(1, n_)]
+                elif not ow and t_.get('highway') not in ('residential', 'unclassified', 'living_street'):
+                    offs = [0.0]
+                else: continue
+                for o in offs:
+                    try: ol = l.offset_curve(o) if o else l
+                    except Exception: continue
+                    for q in lines(ol):
+                        d = 2.0
+                        while d < q.length - 2:
+                            _mk.append(shapely.ops.substring(q, d, min(d + 3.0, q.length))); d += 9.0
+            _plines(_mk, 'marking')
+            # přechody pro chodce: pruhy zebry podél silnice přes celou šířku vozovky
+            _zb = []
+            _rt = [(l, w) for l, kk, w, *_ in _PRE_W if kk == 'road']
+            for _p in _PRE:
+                for nd_ in _p.get('osm', {}).get('nodes', []):
+                    t_ = nd_['t']
+                    if t_.get('highway') != 'crossing' or t_.get('crossing') in ('unmarked', 'no', 'informal'): continue
+                    q = Point(*_mm_xy([nd_['q']])[0])
+                    if not _PRE_ZP.contains(q) or not _rt: continue
+                    l, w = min(_rt, key=lambda r_: r_[0].distance(q))
+                    if l.distance(q) > 1.5: continue
+                    s_ = l.project(q); a_ = l.interpolate(max(0, s_ - 1)); b_ = l.interpolate(min(l.length, s_ + 1))
+                    ux, uy = b_.x - a_.x, b_.y - a_.y; nn = math.hypot(ux, uy) or 1; ux, uy = ux / nn, uy / nn
+                    c_ = l.interpolate(s_)
+                    for k in range(int(w / 1.0)):
+                        o = -w / 2 + 0.5 + k * 1.0
+                        cx_, cy_ = c_.x - uy * o, c_.y + ux * o
+                        _zb.append(LineString([(cx_ - ux * 1.6, cy_ - uy * 1.6), (cx_ + ux * 1.6, cy_ + uy * 1.6)]).buffer(0.25, cap_style='flat'))
+            if _zb: _zpaint(shapely.unary_union(_zb), 'marking')
+            print('MMHK: přestavby', [p['nazev'] for p in _PRE], 'cest z OSM', len(_PRE_W), 'přechodů', len(_zb) // 6)
         # 5b) pod mostovkou (výš než 1 m nad terénem) povrch z doby před pasportem: plocha vozovky a chodníku na mostě
         #     se jinak namaluje i na zem, vodu nebo koleje pod ním (silnice z OSM se pod mosty nekreslí už v prep.py)
         _under_d = []
@@ -268,17 +378,17 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
         cls.paste(Image.fromarray(_A))
         # 6) lampy veřejného osvětlení místo odhadnutých po 34 m
         _n0 = len(props['lamp'])
-        props['lamp'] = [l_ for l_ in props['lamp'] if not _MM_PILP.contains(Point(l_[0], l_[1]))]
+        props['lamp'] = [l_ for l_ in props['lamp'] if not _MM_PILP.contains(Point(l_[0], l_[1])) or _PRE_ZP.contains(Point(l_[0], l_[1]))]
         _nr = _n0 - len(props['lamp']); _nl = 0
         for l_ in _MMHK['lampy']:
             if l_['typ'] == 'reflektor': continue
             x, y = (float(v) for v in to_local(l_['lon'], l_['lat']))
             q = Point(x, y)
-            if not (AREA.contains(q) and _MM_PILP.contains(q)): continue
+            if not (AREA.contains(q) and _MM_PILP.contains(q)) or _PRE_ZP.contains(q): continue
             nd_ = nearest_dir(q, all_tree, all_lines, 15)
             props['lamp'].append([x, y, float(ground(x, y)), nd_[0] if nd_ else 0.0]); _nl += 1
         # 7) zaparkovaná auta na skutečných stáních (řady stání ze značení); odhadnutá auta u ulic v oblasti pryč
-        _stn = [s for s in _MMHK['stani'] if _mm_inbb([[s[0], s[1]]])]
+        _stn = [s for s in _MMHK['stani'] if _mm_inbb([[s[0], s[1]]]) and not _PRE_ZP.contains(Point(*_mm_xy([[s[0], s[1]]])[0]))]
         _sxy = _mm_xy([[s[0], s[1]] for s in _stn]) if _stn else np.zeros((0, 2))
         _sxy2 = _mm_xy([[s[2], s[3]] for s in _stn]) if _stn else np.zeros((0, 2))
         _sp_t = shapely.STRtree([Point(*q) for q in _sxy]) if len(_sxy) else None
@@ -303,7 +413,7 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
         _nz = 0
         for q in _MMHK['zabradli']:
             if len(q) < 2 or not _mm_inbb(q): continue
-            for l in lines(LineString(_mm_xy(q)).intersection(AREA)):
+            for l in lines(LineString(_mm_xy(q)).intersection(AREA).difference(_PRE_Z)):
                 if l.length < 1.5: continue
                 m_ = l.interpolate(0.5, normalized=True)
                 if _MM_WP.contains(m_) or (_decks is not None and len(_decks.query(m_, predicate='dwithin', distance=4.0))): continue

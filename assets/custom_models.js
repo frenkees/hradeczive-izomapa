@@ -34,6 +34,21 @@ function prism(W, R, pushQuad, pushTri, tv, g, pts, z0, z1, cols, st, roof) {
   for (let i = 1; i < pts.length - 1; i++) pushTri(R, tv(...pts[0], z1), tv(...pts[i], z1), tv(...pts[i + 1], z1), roof, [0, 0, 0, 0]);
 }
 
+// Malšovická aréna: zaoblený obdélník v osách arény (s podél, t napříč), rohy po m úsecích, rovné strany po K dílech.
+// Stejný počet bodů pro všechny obrysy -> body jdou spárovat (střecha, hlediště). Body proti směru hodin.
+function arenaRing(hs, ht, r, K = 10, m = 5) {
+  const C4 = [[hs - r, ht - r], [-hs + r, ht - r], [-hs + r, -ht + r], [hs - r, -ht + r]], pts = [];
+  for (let q = 0; q < 4; q++) {
+    const [cs, ct] = C4[q];
+    for (let i = 0; i <= m; i++) { const a = (q + i / m) * Math.PI / 2; pts.push([cs + r * Math.cos(a), ct + r * Math.sin(a)]); }
+    const a1 = ((q + 1) % 4) * Math.PI / 2, [ns, nt] = C4[(q + 1) % 4], e = [ns + r * Math.cos(a1), nt + r * Math.sin(a1)], s0 = pts[pts.length - 1];
+    for (let k = 1; k < K; k++) pts.push([s0[0] + (e[0] - s0[0]) * k / K, s0[1] + (e[1] - s0[1]) * k / K]);
+  }
+  return pts;
+}
+// paty lízátek vůči středu hřiště (východ, sever) v metrech, z OSM
+const ARENA_MASTS = [[-11.4, -88.9], [69.9, -61.1], [15.5, 73.3], [-62.1, 47.9]];
+
 // půdorys v osách: střed, jednotkové vektory delší (u) a kratší (v) osy a rozsahy průmětů
 function frame2(ring) {
   const { cx, cy, ang } = axis(ring), u = [Math.cos(ang), Math.sin(ang)], v = [-u[1], u[0]];
@@ -385,47 +400,155 @@ export const landmarks = {
     return true;
   },
 
-  // Malšovická aréna (2023) se čtyřmi „lízátky“ – památkově chráněnými stožáry osvětlení původního Všesportovního stadionu.
-  // Budova arény v datech Overture zatím chybí, proto samostatná stavba ('only') na středu hřiště: obdélník tribun se světlou
-  // lamelovou fasádou a bílou střechou kolem hřiště (111 × 70 m, osa 110°), stožáry na bodech osvětlení z OSM, nakloněné k hřišti.
+  // Křižovatka Mileta po přestavbě (2024–2026): čtyři podchody pro chodce a cyklisty pod rameny křižovatky.
+  // Geometrie z OSM (assets/prestavby.json, popisky „Podchod 1–4“): tunel = osa pod vozovkou, r = rampy od portálů ven (26 m po cestě).
+  // Souřadnice v metrech vůči bodu dominanty (50.20125, 15.83250). Terén mapy má krok 5 m, rampa se do něj zahloubit nedá:
+  // zářez naznačí betonové zídky se zábradlím, tmavnoucí podlaha rampy a portál s osvětlením.
+  mileta_podchody(b, { X, frameAt, pushBox }) {
+    let cx = 0, cy = 0; for (const [x, y] of b.p) { cx += x / b.p.length; cy += y / b.p.length; }
+    const g = b.g, CONC = C(196, 194, 188), CONC_D = C(150, 148, 144), RAIL = C(70, 76, 84), LAMP = C(255, 236, 190);
+    const PODCHODY = [
+      { w: 4, L: [[-7.47, -59.85], [14.57, -60.44]], r: [[[-7.47, -59.85], [-13.72, -59.62], [-15.48, -54.07], [-16.25, -52.57], [-17.54, -50.06], [-21.8, -45.07], [-23.66, -42.9]], [[14.57, -60.44], [22.81, -60.74], [23.68, -52.11], [25.62, -47.82], [28.47, -44.5]]] },
+      { w: 4, L: [[47.67, -2.39], [41.77, -34.2]], r: [[[47.67, -2.39], [50.18, 8.55], [51.24, 11.26], [56.51, 21.89]], [[41.77, -34.2], [41.73, -35.17], [41.54, -40.34], [36.47, -40.71], [32.5, -41.79], [29.35, -43.47], [25.62, -47.82], [25.06, -49.06]]] },
+      { w: 4, L: [[-20.9, 28.95], [4.52, 24.57]], r: [[[-20.9, 28.95], [-24.16, 29.46], [-27.48, 29.61], [-30.79, 30.92], [-33.92, 32.72], [-36.48, 34.75], [-38.75, 37.77], [-40.47, 41.12], [-40.69, 42.5]], [[4.52, 24.57], [14.77, 22.58], [25.5, 20.48], [30.02, 19.51]]] },
+      { w: 4, L: [[-55.34, 15.35], [-60.92, -13.55]], r: [[[-55.34, 15.35], [-54.3, 19.2], [-53.36, 21.44], [-52.3, 23.6], [-50.8, 26.28], [-48.39, 30.65], [-45.39, 38.04], [-45.01, 39.11]], [[-60.92, -13.55], [-61.92, -17.39], [-52.46, -20.36], [-46.31, -23.46], [-42.81, -25.81], [-41.97, -26.38]]] },
+    ];
+    const RAMP = 20;                                                       // délka zářezu rampy od portálu
+    for (const pd of PODCHODY) {
+      const hw = pd.w / 2 + 0.25;
+      for (const r of pd.r) {
+        // portál: čelní zeď nad tunelem (kolmo na směr rampy), tmavý otvor, světelný pás nad otvorem
+        const [p0, p1] = [r[0], r[1]], a0 = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]);
+        const fp = frameAt(cx + p0[0], cy + p0[1], 0, a0);
+        pushBox(X, fp, -0.7, 0.0, -hw - 0.9, hw + 0.9, g - 0.3, g + 1.15, CONC, [0, 1, 0, 0]);
+        pushBox(X, fp, 0.0, 0.04, -pd.w / 2, pd.w / 2, g - 0.3, g + 0.55, C(22, 22, 26), [0, 1, 0, 0]);        // otvor
+        pushBox(X, fp, 0.04, 0.1, -pd.w / 2 + 0.3, pd.w / 2 - 0.3, g + 0.6, g + 0.72, LAMP, [0.9, 1, 0, 0]); // osvětlení
+        pushBox(X, fp, -0.75, 0.05, -hw - 0.95, hw + 0.95, g + 1.15, g + 1.25, CONC_D, [0, 1, 0, 0]);         // římsa
+        // zářez rampy: zídky s madlem po obou stranách, podlaha od portálu tmavá (hloubka), ke konci světlá
+        let run = 0;
+        for (let i = 0; i < r.length - 1 && run < RAMP; i++) {
+          const [x0, y0] = r[i], [x1, y1] = r[i + 1];
+          const len = Math.min(Math.hypot(x1 - x0, y1 - y0), RAMP - run); if (len < 0.2) continue;
+          const a = Math.atan2(y1 - y0, x1 - x0), f = frameAt(cx + x0, cy + y0, 0, a);
+          const k0 = run / RAMP, k1 = (run + len) / RAMP;
+          const zw0 = g + 1.0 - 0.8 * k0, zw1 = g + 1.0 - 0.8 * k1;                  // zídka u portálu vyšší, ke konci rampy klesá
+          const N = Math.max(1, Math.ceil(len / 2));
+          for (let k = 0; k < N; k++) {
+            const s0 = len * k / N, s1 = len * (k + 1) / N + 0.25, t = (run + (s0 + s1) / 2) / RAMP;
+            const zt = zw0 + (zw1 - zw0) * (k + 0.5) / N, sh = Math.round(46 + 90 * Math.min(1, t * 1.25));
+            pushBox(X, f, s0, s1, -pd.w / 2, pd.w / 2, g, g + 0.05, C(sh, sh, sh + 4), [0, 1, 0, 0]);       // podlaha
+            for (const sd of [-1, 1]) {
+              pushBox(X, f, s0, s1, sd * hw - 0.15, sd * hw + 0.15, g - 0.3, zt, CONC, [0, 1, 0, 0]);         // zídka
+              pushBox(X, f, s0, s1, sd * hw - 0.04, sd * hw + 0.04, zt + 0.85, zt + 0.92, RAIL, [0, 1, 0, 0]); // madlo
+              if (k % 1 === 0) pushBox(X, f, s0, s0 + 0.06, sd * hw - 0.03, sd * hw + 0.03, zt, zt + 0.9, RAIL, [0, 1, 0, 0]);
+            }
+          }
+          run += len;
+        }
+      }
+    }
+    return true;
+  },
+
+  // Malšovická aréna / FINEP Arena (2023, Tomáš Vymetálek Architects) podle ortofota ČÚZK a fotek z Wikimedia Commons:
+  // zaoblený obdélník tribun 140 × 100 m (osa 110,4°), fasáda ze svislých stříbrných perforovaných lamel nad tmavým parterem
+  // se zlatou linkou, bílá membránová střecha na ocelových příhradovinách s otvorem nad hřištěm, na západě hlavní tribuna
+  // s budovou a nápisem STADION HRADEC KRÁLOVÉ, u severní tribuny velkoplošná obrazovka. Čtyři „lízátka“ (stožáry osvětlení
+  // Všesportovního stadionu z roku 1975, 55 m, terč přes 10 m) stojí na bodech z OSM, dřík je nakloněný ke hřišti a podepřený vzpěrou.
+  // Barevné LED fasády, rozsvícená lízátka a obsah obrazovky kreslí animovaná vrstva (assets/custom_web.js), ne dlaždice.
+  // Rozměry sdílí s custom_web.js (ARENA) – při změně upravit obojí.
   malsovicka_arena(b, { X, W, R, frameAt, ring, pushBox, pushQuad, pushTri, tv }) {
     let cx = 0, cy = 0; for (const [x, y] of b.p) { cx += x / b.p.length; cy += y / b.p.length; }
     const g = b.g, A = 110.4 * Math.PI / 180, f = frameAt(cx, cy, 0, A);
-    const FAS = C(200, 203, 206), FAS_D = C(150, 154, 160), ROOF = C(236, 238, 238), INNER = C(96, 98, 104);
-    // tribuny: vnější obdélník 147 × 116 m, vnitřní (okraj střechy) 125 × 84 m
-    const oL = 73.5, oW = 58, iL = 62.5, iW = 42, H0 = 17.5, H1 = 20.5;
-    const out = [[-oL, -oW], [oL, -oW], [oL, oW], [-oL, oW]], inn = [[-iL, -iW], [iL, -iW], [iL, iW], [-iL, iW]];
-    for (let i = 0; i < 4; i++) {
-      const [a0, b0] = out[i], [a1, b1] = out[(i + 1) % 4], [c0, d0] = inn[i], [c1, d1] = inn[(i + 1) % 4];
-      pushQuad(X, f(a0, b0, g - 0.6), f(a1, b1, g - 0.6), f(a1, b1, g + H0), f(a0, b0, g + H0), FAS, [0, 1, 0, 0]);   // fasáda
-      // svislé lamely fasády po 3 m (tmavší pásky)
-      const len = Math.hypot(a1 - a0, b1 - b0), n = Math.floor(len / 3);
-      for (let k = 1; k < n; k++) {
-        const t = k / n, x = a0 + (a1 - a0) * t, y = b0 + (b1 - b0) * t, nx = -(b1 - b0) / len, ny = (a1 - a0) / len;
-        pushQuad(X, f(x - nx * 0.05, y - ny * 0.05, g + 3.5), f(x - nx * 0.05 + (a1 - a0) / len * 0.35, y - ny * 0.05 + (b1 - b0) / len * 0.35, g + 3.5),
-          f(x - nx * 0.05 + (a1 - a0) / len * 0.35, y - ny * 0.05 + (b1 - b0) / len * 0.35, g + H0 - 0.5), f(x - nx * 0.05, y - ny * 0.05, g + H0 - 0.5), FAS_D, [0, 1, 0, 0]);
+    const FAS = C(206, 209, 213), LAM = C(168, 173, 180), PLINTH = C(48, 52, 58), GOLD = C(196, 160, 82), GLASS = C(72, 84, 98);
+    const ROOF = C(236, 238, 236), TRUSS = C(150, 156, 164), SEAT = C(74, 78, 86), SEAT_L = C(104, 108, 116), BOARD = C(36, 40, 48);
+    const solid = [0, 1, 0, 0];
+    const OUT = arenaRing(70, 50, 15), IN = arenaRing(56.5, 36.5, 7), ST0 = arenaRing(54, 35, 4), ST1 = arenaRing(67, 47.5, 12.5);
+    const H0 = 17.0, H1 = 19.2, n = OUT.length;
+    const lerp = (p0, p1, t) => [p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t];
+    // fasáda jednoho úseku: tmavý parter s prosklením, zlatá linka, stříbrné lamely (tmavší vystouplé pásky po 1,6 m)
+    const facade = (a0, b0, a1, b1, top) => {
+      pushQuad(X, f(a0, b0, g - 0.6), f(a1, b1, g - 0.6), f(a1, b1, g + 3.2), f(a0, b0, g + 3.2), PLINTH, solid);
+      pushQuad(X, f(a0, b0, g + 1.0), f(a1, b1, g + 1.0), f(a1, b1, g + 2.8), f(a0, b0, g + 2.8), GLASS, [0.4, 1, 0, 0]);
+      pushQuad(X, f(a0, b0, g + 3.2), f(a1, b1, g + 3.2), f(a1, b1, g + 3.55), f(a0, b0, g + 3.55), GOLD, solid);
+      pushQuad(X, f(a0, b0, g + 3.55), f(a1, b1, g + 3.55), f(a1, b1, g + top), f(a0, b0, g + top), FAS, solid);
+      const len = Math.hypot(a1 - a0, b1 - b0), nx = (b1 - b0) / len, ny = -(a1 - a0) / len, cnt = Math.max(1, Math.round(len / 1.6));
+      for (let k = 0; k < cnt; k++) {
+        const p = (t) => [a0 + (a1 - a0) * t + nx * 0.12, b0 + (b1 - b0) * t + ny * 0.12];
+        const [u0, v0] = p((k + 0.15) / cnt), [u1, v1] = p((k + 0.45) / cnt);
+        pushQuad(X, f(u0, v0, g + 3.7), f(u1, v1, g + 3.7), f(u1, v1, g + top - 0.3), f(u0, v0, g + top - 0.3), LAM, solid);
       }
-      pushQuad(X, f(a0, b0, g + 0.4), f(a1, b1, g + 0.4), f(a1, b1, g + 3.2), f(a0, b0, g + 3.2), C(70, 78, 88), [0.5, 1, 0, 0]);   // prosklený parter
-      pushQuad(R, f(a0, b0, g + H0), f(a1, b1, g + H0), f(c1, d1, g + H1), f(c0, d0, g + H1), ROOF, [0, 0, 1, 0]);             // střecha
-      pushQuad(X, f(c1, d1, g), f(c0, d0, g), f(c0, d0, g + H1), f(c1, d1, g + H1), INNER, [0, 1, 0, 0]);                      // tribuna pod střechou
+    };
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n, [a0, b0] = OUT[i], [a1, b1] = OUT[j];
+      const west = (b0 + b1) / 2 > 46 && Math.abs((a0 + a1) / 2) < 36;                        // úsek zakrytý budovou hlavní tribuny
+      if (!west) facade(a0, b0, a1, b1, H0);
+      // střecha: od vnější hrany (H0) k okraji otvoru (H1), bílá membrána
+      const [c0, d0] = IN[i], [c1, d1] = IN[j];
+      pushQuad(R, f(a0, b0, g + H0), f(a1, b1, g + H0), f(c1, d1, g + H1), f(c0, d0, g + H1), ROOF, [0, 0, 1, 0]);
+      // příhradový vazník nad střechou v každém druhém bodě a obvodový nosník u otvoru
+      if (i % 2 === 0) {
+        const q = [a0 - c0, b0 - d0], L = Math.hypot(...q), ux = -q[1] / L * 0.14, uy = q[0] / L * 0.14;
+        for (const [z0, z1] of [[0.05, 0.25], [1.2, 1.5]])
+          pushQuad(X, f(a0 - ux, b0 - uy, g + H0 + z0), f(a0 + ux, b0 + uy, g + H0 + z0), f(c0 + ux, d0 + uy, g + H1 + z1), f(c0 - ux, d0 - uy, g + H1 + z1), TRUSS, solid);
+        pushQuad(X, f(a0, b0, g + H0), f(a0, b0, g + H0 + 0.6), f(c0, d0, g + H1 + 1.5), f(c0, d0, g + H1), TRUSS, solid);
+      }
+      pushQuad(X, f(c0, d0, g + H1 - 1.0), f(c1, d1, g + H1 - 1.0), f(c1, d1, g + H1 + 0.3), f(c0, d0, g + H1 + 0.3), TRUSS, solid);
+      // hlediště pod střechou (vidět otvorem): šest pásů od mantinelu nahoru, světlejší řady
+      for (let r_ = 0; r_ < 6; r_++) {
+        const t0 = r_ / 6, t1 = (r_ + 1) / 6;
+        const A0 = lerp(ST0[i], ST1[i], t0), A1 = lerp(ST0[j], ST1[j], t0), B0 = lerp(ST0[i], ST1[i], t1), B1 = lerp(ST0[j], ST1[j], t1);
+        pushQuad(X, f(...A0, g + 1.2 + 13 * t0), f(...A1, g + 1.2 + 13 * t0), f(...B1, g + 1.2 + 13 * t1), f(...B0, g + 1.2 + 13 * t1), r_ % 2 ? SEAT_L : SEAT, solid);
+      }
+      pushQuad(X, f(...ST0[i], g), f(...ST0[j], g), f(...ST0[j], g + 1.2), f(...ST0[i], g + 1.2), BOARD, [0.25, 1, 0, 0]);   // reklamní mantinel
     }
-    // lízátka: bod osvětlení vůči středu hřiště (východ, sever) v metrech, změřeno z OSM
-    const MAST = C(58, 62, 68), DISC = C(206, 210, 214), GRID = C(120, 126, 134);
-    for (const [dx, dy] of [[-11.4, -88.9], [69.9, -61.1], [15.5, 73.3], [-62.1, 47.9]]) {
-      const x0 = cx + dx, y0 = cy + dy, d = Math.hypot(dx, dy), ux = -dx / d, uy = -dy / d;   // směr ke středu
-      const top = 52, lean = 9;                                                                // výška terče, náklon vrcholu ke hřišti
-      const N = 8;
+    // budova hlavní tribuny na západě (t 47 … 73, s −36 … 40): lamelová fasáda, technika na střeše, nápis a znak klubu
+    const BW = [[-36, 47], [40, 47], [40, 73], [-36, 73]];
+    for (let i = 1; i < 4; i++) facade(...BW[i], ...BW[(i + 1) % 4], H0 + 0.5);
+    pushQuad(R, f(-36, 47, g + H0 + 0.5), f(40, 47, g + H0 + 0.5), f(40, 73, g + H0 + 0.5), f(-36, 73, g + H0 + 0.5), C(176, 178, 178), [0, 0, 1, 0]);
+    for (const [s0, t0, w_, d_, h_] of [[-20, 52, 9, 6, 2.2], [-6, 58, 6, 5, 1.6], [10, 54, 12, 7, 2.6], [26, 60, 6, 6, 1.8]])
+      pushBox(X, f, s0, s0 + w_, t0, t0 + d_, g + H0 + 0.5, g + H0 + 0.5 + h_, C(150, 152, 154), [0, 1, 1, 0]);
+    // nápis STADION / HRADEC KRÁLOVÉ a kulatý znak klubu na západní fasádě (t = 73), tmavé litery
+    const sign = (s0, s1, z0, z1, letters) => {
+      const w_ = (s1 - s0) / letters;
+      for (let k = 0; k < letters; k++) pushBox(X, f, s0 + k * w_ + w_ * 0.15, s0 + (k + 1) * w_ - w_ * 0.15, 73.05, 73.25, g + z0, g + z1, C(40, 44, 54), solid);
+    };
+    sign(-4, 14, 10.6, 13.4, 7); sign(-8, 18, 7.6, 9.6, 14);
+    pushBox(X, f, -15, -10, 73.05, 73.3, g + 7.4, g + 12.4, C(236, 236, 232), solid);
+    pushBox(X, f, -14.2, -10.8, 73.3, 73.4, g + 8.2, g + 11.6, C(30, 30, 34), solid);
+    // velkoplošná obrazovka u severní tribuny (s ≈ 60, t = 0), obrazem k hřišti; obsah kreslí animovaná vrstva
+    for (const t_ of [-5.5, 5.5]) pushBox(X, f, 60.6, 61.2, t_ - 0.3, t_ + 0.3, g + H0, g + 27.2, TRUSS, solid);
+    pushBox(X, f, 60.0, 60.6, -7.4, 7.4, g + 19.3, g + 26.9, C(58, 62, 70), solid);              // skříň
+    pushBox(X, f, 59.85, 60.0, -6.9, 6.9, g + 19.7, g + 26.5, C(14, 16, 22), [0.2, 1, 0, 0]);     // stínítko
+    // lízátka: pata stožáru vůči středu hřiště (východ, sever) z OSM; dřík nakloněný ke hřišti, vzpěra, terč 11 m skloněný ke hřišti
+    const MAST = C(54, 58, 64), RIM = C(214, 218, 222), LAMPC = C(186, 192, 198), GRID = C(96, 102, 110);
+    for (const [dx, dy] of ARENA_MASTS) {
+      const x0 = cx + dx, y0 = cy + dy, d = Math.hypot(dx, dy), ux = -dx / d, uy = -dy / d;     // směr ke středu
+      const top = 53, lean = 10, N = 8;
       for (let k = 0; k < N; k++) {                                                            // zužující se nakloněný dřík
-        const t0 = k / N, t1 = (k + 1) / N, r0 = 0.9 - 0.45 * t0, r1 = 0.9 - 0.45 * t1;
+        const t0 = k / N, t1 = (k + 1) / N, r0 = 0.95 - 0.5 * t0, r1 = 0.95 - 0.5 * t1;
         const p0 = frameAt(x0 + ux * lean * t0, y0 + uy * lean * t0, 0, 0), p1x = x0 + ux * lean * t1, p1y = y0 + uy * lean * t1;
-        ring(X, (s, t, h) => (h < g + top * t1 - 0.01 ? p0(s, t, h) : frameAt(p1x, p1y, 0, 0)(s, t, h)), r0, r1, g + top * t0, g + top * t1, 6, MAST, [0, 1, 0, 0]);
+        ring(X, (s, t, h) => (h < g + top * t1 - 0.01 ? p0(s, t, h) : frameAt(p1x, p1y, 0, 0)(s, t, h)), r0, r1, g + top * t0, g + top * t1, 6, MAST, solid);
       }
-      // terč: svislý kruh (průměr 10 m) kolmo ke směru na hřiště, stříbrný s tmavším rastrem, v noci svítí
-      const fx = x0 + ux * lean, fy = y0 + uy * lean, fd = frameAt(fx, fy, 0, Math.atan2(uy, ux));
-      const R0 = 5.0, n = 9;
-      for (let k = 0; k < n; k++) {
-        const v0 = -R0 + 2 * R0 * k / n, v1 = -R0 + 2 * R0 * (k + 1) / n, vm = (v0 + v1) / 2, w = R0 * Math.sqrt(1 - (vm / R0) ** 2);
-        pushBox(X, fd, -0.35, 0.35, -w, w, g + top + v0, g + top + v1, k % 2 ? DISC : GRID, [0.9, 1, 0, 0]);
+      // vzpěra: od paty 9 m dál od hřiště k dříku ve 45 % výšky
+      const bx = x0 - ux * 9, by = y0 - uy * 9, jx = x0 + ux * lean * 0.45, jy = y0 + uy * lean * 0.45, jz = g + top * 0.45;
+      const sx_ = -uy * 0.25, sy_ = ux * 0.25;
+      pushQuad(X, tv(bx - sx_, by - sy_, g), tv(bx + sx_, by + sy_, g), tv(jx + sx_, jy + sy_, jz), tv(jx - sx_, jy - sy_, jz), MAST, solid);
+      pushQuad(X, tv(bx, by, g), tv(bx - ux * 0.5, by - uy * 0.5, g), tv(jx - ux * 0.4, jy - uy * 0.4, jz), tv(jx, jy, jz), MAST, solid);
+      // terč: rovina kolmá na směr ke hřišti, skloněná o 18° dolů; obvodový prstenec, řady reflektorů, zezadu tmavá mřížka
+      const fx = x0 + ux * lean, fy = y0 + uy * lean, tl = 18 * Math.PI / 180, R0 = 5.6, rx = -uy, ry = ux;
+      const P = (a, v, o = 0) => tv(fx + rx * a + ux * (o - v * Math.sin(tl)), fy + ry * a + uy * (o - v * Math.sin(tl)), g + top + v * Math.cos(tl));
+      const M = 20, cs = (r, a) => [r * Math.cos(a), r * Math.sin(a)];
+      for (let k = 0; k < M; k++) {
+        const a0 = 2 * Math.PI * k / M, a1 = 2 * Math.PI * (k + 1) / M;
+        for (const o of [0.25, -0.25]) pushQuad(X, P(...cs(R0, a0), o), P(...cs(R0, a1), o), P(...cs(R0 - 0.7, a1), o), P(...cs(R0 - 0.7, a0), o), RIM, solid);
+        pushQuad(X, P(...cs(R0, a0), 0.25), P(...cs(R0, a1), 0.25), P(...cs(R0, a1), -0.25), P(...cs(R0, a0), -0.25), RIM, solid);
+      }
+      for (let r_ = -4; r_ <= 4; r_++) {
+        const v = r_ * 1.15, w_ = Math.sqrt(Math.max(0, (R0 - 0.7) ** 2 - v * v));
+        if (w_ < 0.5) continue;
+        pushQuad(X, P(-w_, v - 0.4, 0.05), P(w_, v - 0.4, 0.05), P(w_, v + 0.4, 0.05), P(-w_, v + 0.4, 0.05), LAMPC, solid);
+        pushQuad(X, P(-w_, v - 0.55, -0.2), P(w_, v - 0.55, -0.2), P(w_, v + 0.55, -0.2), P(-w_, v + 0.55, -0.2), GRID, solid);
       }
     }
     return true;

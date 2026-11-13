@@ -335,6 +335,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   <h2 id="cardTitle"></h2>
   <p id="cardText" hidden></p>
   <dl id="cardDl"></dl>
+  <div id="cardExtra"></div>
   <div class="links" id="cardLinks"></div>
   <details class="report" id="report" hidden>
     <summary>Nahlásit nepřesnost</summary>
@@ -392,7 +393,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 </nav>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.1.0/openseadragon.min.js" integrity="sha384-4BsIv4BUV37POdA1NZ6UcVAsFk96MQXmFLog7pWs+JP+a8k2XjilfManEVdWDxTe" crossorigin="anonymous"></script>
-<script>
+{{CUSTOM_WEB}}<script>
 (async () => {
 
   const [TILES, OV] = await Promise.all([fetch('tiles.json').then((r) => r.json()), fetch('overlay.json').then((r) => r.json())]);
@@ -413,6 +414,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   const isMobile = () => matchMedia('(max-width: 640px)').matches;
   let uiDepth = 0, uiPop = false, uiBackAt = 0, uiSelf = 0;
   const state = { season: 'summer', night: 0, weather: 'clear', sel: null, hover: null, wip: false };
+  // vlastní rozšíření města (assets/custom_web.js -> window.IZOMAPA_PLUGINS): kreslení do animované vrstvy a doplnění karty
+  let PLUGINS = [];
   const hashTokens = (location.hash || '').slice(1).split('@')[0].split('-');
   const SEASON_TOKEN = { jaro: 'spring', leto: 'summer', podzim: 'autumn', zima: 'winter' };
   for (const t of hashTokens) { if (SEASON_TOKEN[t]) state.season = SEASON_TOKEN[t]; if (t === 'noc') state.night = 1; if (t === 'soumrak') state.night = 0.42; if (t === 'vse') state.wip = true; }
@@ -809,6 +812,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     $('cardTitle').textContent = title;
     if (k && !(LAYERS.find((l) => l.key === k) || {}).status?.startsWith('hotovo')) { const t = document.createElement('span'); t.className = 'wip-tag'; t.textContent = 'Rozpracováno'; $('cardTitle').append(' ', t); }
     $('cardText').hidden = !text; $('cardText').textContent = text || '';
+    $('cardExtra').replaceChildren();
     const dl = $('cardDl'); dl.replaceChildren();
     for (const [k, v] of rows) { if (v === undefined || v === null || v === '') continue; const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); }
     const links = $('cardLinks'); links.replaceChildren();
@@ -827,6 +831,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     links.append(a, s);
     $('card').style.transform = '';
     $('card').hidden = false;
+    for (const p of PLUGINS) if (p.card) try { p.card({ title, lon, lat, el: $('cardExtra') }); } catch (e) { console.warn(e); }
     setReport(`pt:${lat.toFixed(5)},${lon.toFixed(5)}`, title, lon, lat);     // výchozí cíl hlášení = místo, budova ho přepíše
   }
   // hlášení nepřesností: jen když je zapnuté v mesto.json ("hlaseni": true) a běží server z hlaseni/
@@ -2604,6 +2609,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         ctx.globalAlpha = on; ctx.fillRect(X0 + Math.round(lx * k), Y0 + Math.round(ly * k), k, k); ctx.globalAlpha = 1;
       });
     }
+    // vlastní rozšíření města (assets/custom_web.js)
+    for (const p of PLUGINS) if (p.draw) try { p.draw({ ctx, sx, ox, oy, night, t, now, cw, ch, vis, dt }); } catch (e) { console.warn(e); p.draw = null; }
     // svíčky na hřbitovech: večer; kolem Dušiček (30. 10.–10. 11.) skoro na každém hrobě, na Štědrý den na většině, jinak jen tu a tam.
     // Hřbitovní lampy jsou červené, žluté a bílé; plamen se mihotá, při přiblížení kolem něj malá záře
     if (night > 0.3 && sx > 0.1 && svicky.length) {
@@ -2711,6 +2718,12 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       if (st !== scaleTxt) { scaleTxt = st; $('scale').textContent = st; }
     }
   }
+  PLUGINS = (window.IZOMAPA_PLUGINS || []).map((f) => {
+    try {
+      return f({ state, toImg, gz, depth, occluded, lonlat, showCard, shown,
+        local: (lat, lon) => [(lon - cam.lon0) * cam.kx, (lat - cam.lat0) * cam.ky] });
+    } catch (e) { console.warn(e); return null; }
+  }).filter(Boolean);
   requestAnimationFrame(frame);
 })();
 </script>

@@ -1,6 +1,6 @@
 """Z web/app.html a mesto.json vyrobí site/index.html (texty, meta, sitemap).
 Pokud existuje složka obce/*.json, vyrobí pro každou obec i site/index_<obec>.html a site/obce/<obec>/og.jpg."""
-import html, json, os, re
+import shutil, html, json, os, re
 from urllib.parse import urljoin
 from PIL import Image
 import geo
@@ -87,9 +87,13 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'DALSI_ZDROJE': ''.join(f', <a href="{E(z["url"])}" target="_blank" rel="noopener">{E(z["text"])}</a>' if z.get('url') else f', {E(z["text"])}'
                                 for z in M.get('dalsi_zdroje', [])),
         'LETADLA_ZDROJ': ', letadla © <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a> (ODbL)' if M.get('letadla', False) else '',
+        # vlastní rozšíření prohlížeče města (assets/custom_web.js, zkopíruje se do site/): window.IZOMAPA_PLUGINS
+        'CUSTOM_WEB': (f'<script src="custom_web.js?v={int(os.path.getmtime("assets/custom_web.js"))}"></script>' + '\n')
+                      if os.path.exists('assets/custom_web.js') else '',
         'MHD_ZDROJ': f', jízdní řády MHD © <a href="{E(mhd["zdroj_url"])}" target="_blank" rel="noopener">{E(mhd["zdroj"])}</a>'
                      if mhd.get('gtfs') and mhd.get('zdroj') else '',
     }
+    if os.path.exists('assets/custom_web.js'): shutil.copyfile('assets/custom_web.js', 'site/custom_web.js')
     app = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], SABLONA)
     og = f'''<meta property="og:image" content="{E(obrazek_url)}">
 <meta property="og:url" content="{E(page_url)}">

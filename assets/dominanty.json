@@ -17,8 +17,16 @@
   "lon": 15.830987,
   "text": "Gotická cihlová katedrála; dvě hranolové věže s tmavými jehlany stojí po stranách štítu čelem k Velkému náměstí (východ, ověřeno na ortofotu ČÚZK), střecha má zelenou měděnou patinu.",
   "spec": {
-   "wc": [148, 74, 54],
-   "rc": [100, 132, 118],
+   "wc": [
+    148,
+    74,
+    54
+   ],
+   "rc": [
+    100,
+    132,
+    118
+   ],
    "r": "gabled",
    "h": 17,
    "rh": 15,
@@ -31,8 +39,16 @@
      "h": 36,
      "top": "spire",
      "to": 52,
-     "tc": [66, 72, 74],
-     "wc": [140, 68, 50]
+     "tc": [
+      66,
+      72,
+      74
+     ],
+     "wc": [
+      140,
+      68,
+      50
+     ]
     },
     {
      "at": "front",
@@ -41,11 +57,22 @@
      "h": 36,
      "top": "spire",
      "to": 51,
-     "tc": [66, 72, 74],
-     "wc": [140, 68, 50]
+     "tc": [
+      66,
+      72,
+      74
+     ],
+     "wc": [
+      140,
+      68,
+      50
+     ]
     }
    ],
-   "face": [50.2088, 15.8319]
+   "face": [
+    50.2088,
+    15.8319
+   ]
   }
  },
  {
@@ -55,8 +82,16 @@
   "text": "Gočárova budova gymnázia (1925–27): cihlová křídla, uprostřed lomeného průčelí vyšší blok se světlou fasádou mezi dvěma pylony, před ním sloup se sochou. Podle fotek z Wikimedia Commons a ortofota ČÚZK.",
   "spec": {
    "lm": "gymnazium_tyl",
-   "wc": [184, 90, 58],
-   "rc": [92, 92, 94],
+   "wc": [
+    184,
+    90,
+    58
+   ],
+   "rc": [
+    92,
+    92,
+    94
+   ],
    "r": "flat",
    "h": 16.5,
    "win": 1,
@@ -78,8 +113,16 @@
   "text": "Vodní elektrárna Hučák (F. Sander, 1909–12): cihlová budova s bílými římsami, tmavá mansarda, hodinová věž s bílým štítem a mansardovou bání u jezu. Podle volně licencovaných fotek (pohled z jihu, ze severu a noční) a ortofota ČÚZK.",
   "spec": {
    "lm": "hucak_budova",
-   "wc": [184, 90, 62],
-   "rc": [70, 74, 82],
+   "wc": [
+    184,
+    90,
+    62
+   ],
+   "rc": [
+    70,
+    74,
+    82
+   ],
    "r": "hipped",
    "h": 11.0,
    "rh": 5.5,
@@ -102,8 +145,16 @@
   "text": "Strojovna Hučáku: hala s velkými půlkruhovými okny do řeky, bílé římsy, lucerny na hřebeni. Podle volně licencovaných fotek (pohled z jihu, ze severu a noční) a ortofota ČÚZK.",
   "spec": {
    "lm": "hucak_hala",
-   "wc": [184, 90, 62],
-   "rc": [96, 100, 108],
+   "wc": [
+    184,
+    90,
+    62
+   ],
+   "rc": [
+    96,
+    100,
+    108
+   ],
    "r": "gabled",
    "h": 10.0,
    "rh": 5,
@@ -118,8 +169,16 @@
   "text": "Strojovna Hučáku: hala s velkými půlkruhovými okny do řeky, bílé římsy, lucerny na hřebeni. Podle volně licencovaných fotek (pohled z jihu, ze severu a noční) a ortofota ČÚZK.",
   "spec": {
    "lm": "hucak_hala",
-   "wc": [184, 90, 62],
-   "rc": [96, 100, 108],
+   "wc": [
+    184,
+    90,
+    62
+   ],
+   "rc": [
+    96,
+    100,
+    108
+   ],
    "r": "gabled",
    "h": 10.0,
    "rh": 5,
@@ -133,8 +192,16 @@
   "lon": 15.821888,
   "text": "Funkcionalistický dům na jižní straně Ulrichova náměstí: hnědý keramický obklad, pásy oken, ustoupené horní patro, prosklený parter s obchody. Podle fotek z Wikimedia Commons.",
   "spec": {
-   "wc": [126, 96, 78],
-   "rc": [104, 104, 106],
+   "wc": [
+    126,
+    96,
+    78
+   ],
+   "rc": [
+    104,
+    104,
+    106
+   ],
    "r": "flat",
    "h": 20.5,
    "win": 3
@@ -144,7 +211,7 @@
   "name": "Malšovická aréna",
   "lat": 50.206419,
   "lon": 15.845422,
-  "text": "Fotbalový stadion (2023) se čtyřmi stožáry osvětlení – „lízátky“ původního Všesportovního stadionu. Budova v datech chybí, model podle fotek z Wikimedia Commons, ortofota ČÚZK a bodů osvětlení z OSM.",
+  "text": "Malšovická aréna, dnes FINEP Arena (2023, Tomáš Vymetálek Architects), domov FC Hradec Králové. Fasáda ze stříbrných perforovaných lamel, bílá membránová střecha na ocelových příhradovinách a čtyři „lízátka“ – 55m stožáry osvětlení původního Všesportovního stadionu z roku 1975, po rekonstrukci vrácené na svá místa. Model podle ortofota ČÚZK a fotek z Wikimedia Commons; rozpis zápasů z fchk.cz.",
   "spec": {
    "only": 1,
    "lm": "malsovicka_arena",
@@ -162,8 +229,16 @@
    "lm": "zimni_stadion",
    "h": 0.5,
    "r": "flat",
-   "wc": [150, 152, 156],
-   "rc": [150, 152, 156],
+   "wc": [
+    150,
+    152,
+    156
+   ],
+   "rc": [
+    150,
+    152,
+    156
+   ],
    "top": 18.5
   }
  },
@@ -176,8 +251,16 @@
    "lm": "zimni_hala2",
    "h": 5.0,
    "r": "flat",
-   "wc": [214, 196, 150],
-   "rc": [236, 236, 232],
+   "wc": [
+    214,
+    196,
+    150
+   ],
+   "rc": [
+    236,
+    236,
+    232
+   ],
    "win": 3,
    "top": 10.5
   }
@@ -195,10 +278,22 @@
    "top": 15,
    "cls": "jez",
    "probe": {
-    "hore": [50.207343, 15.825538],
-    "dole": [50.207083, 15.825234],
-    "breh_z": [50.207446, 15.824916],
-    "breh_v": [50.207014, 15.825799]
+    "hore": [
+     50.207343,
+     15.825538
+    ],
+    "dole": [
+     50.207083,
+     15.825234
+    ],
+    "breh_z": [
+     50.207446,
+     15.824916
+    ],
+    "breh_v": [
+     50.207014,
+     15.825799
+    ]
    }
   }
  },
@@ -210,8 +305,16 @@
   "spec": {
    "h": 0.3,
    "r": "flat",
-   "rc": [150, 146, 140],
-   "wc": [150, 146, 140]
+   "rc": [
+    150,
+    146,
+    140
+   ],
+   "wc": [
+    150,
+    146,
+    140
+   ]
   }
  },
  {
@@ -222,8 +325,16 @@
   "spec": {
    "h": 4.6,
    "r": "flat",
-   "wc": [150, 172, 188],
-   "rc": [120, 124, 128],
+   "wc": [
+    150,
+    172,
+    188
+   ],
+   "rc": [
+    120,
+    124,
+    128
+   ],
    "win": 3
   }
  },
@@ -235,8 +346,16 @@
   "spec": {
    "h": 4.6,
    "r": "flat",
-   "wc": [150, 172, 188],
-   "rc": [120, 124, 128],
+   "wc": [
+    150,
+    172,
+    188
+   ],
+   "rc": [
+    120,
+    124,
+    128
+   ],
    "win": 3
   }
  },
@@ -274,13 +393,24 @@
   "lon": 15.810767,
   "text": "Funkcionalistická budova hlavního nádraží s hodinovou věží v průčelí k Riegrovu náměstí. Podle fotek z Wikimedia Commons a ortofota ČÚZK.",
   "spec": {
-   "wc": [226, 220, 200],
-   "rc": [156, 84, 62],
+   "wc": [
+    226,
+    220,
+    200
+   ],
+   "rc": [
+    156,
+    84,
+    62
+   ],
    "r": "gabled",
    "h": 13.5,
    "rh": 6,
    "win": 8,
-   "face": [50.21434, 15.81174],
+   "face": [
+    50.21434,
+    15.81174
+   ],
    "towers": [
     {
      "at": "front",
@@ -289,8 +419,16 @@
      "h": 40,
      "top": "pyramid",
      "to": 44,
-     "tc": [96, 142, 122],
-     "wc": [218, 212, 194],
+     "tc": [
+      96,
+      142,
+      122
+     ],
+     "wc": [
+      218,
+      212,
+      194
+     ],
      "clock": 1
     }
    ]
@@ -302,8 +440,16 @@
   "lon": 15.833068,
   "text": "Gayerova kasárna (neorenesanční okrová kasárna s kamennými římsami) a nový parkovací dům. Podle fotek z Wikimedia Commons, ortofota a laseru ČÚZK.",
   "spec": {
-   "wc": [208, 176, 118],
-   "rc": [132, 86, 66],
+   "wc": [
+    208,
+    176,
+    118
+   ],
+   "rc": [
+    132,
+    86,
+    66
+   ],
    "r": "hipped",
    "h": 12.0,
    "rh": 4.5,
@@ -316,8 +462,16 @@
   "lon": 15.832257,
   "text": "Gayerova kasárna (neorenesanční okrová kasárna s kamennými římsami) a nový parkovací dům. Podle fotek z Wikimedia Commons, ortofota a laseru ČÚZK.",
   "spec": {
-   "wc": [208, 176, 118],
-   "rc": [150, 150, 148],
+   "wc": [
+    208,
+    176,
+    118
+   ],
+   "rc": [
+    150,
+    150,
+    148
+   ],
    "r": "flat",
    "h": 10.4,
    "win": 11
@@ -329,8 +483,16 @@
   "lon": 15.833676,
   "text": "Gayerova kasárna (neorenesanční okrová kasárna s kamennými římsami) a nový parkovací dům. Podle fotek z Wikimedia Commons, ortofota a laseru ČÚZK.",
   "spec": {
-   "wc": [208, 176, 118],
-   "rc": [118, 120, 122],
+   "wc": [
+    208,
+    176,
+    118
+   ],
+   "rc": [
+    118,
+    120,
+    122
+   ],
    "r": "flat",
    "h": 10.6,
    "win": 11
@@ -342,8 +504,16 @@
   "lon": 15.832695,
   "text": "Gayerova kasárna (neorenesanční okrová kasárna s kamennými římsami) a nový parkovací dům. Podle fotek z Wikimedia Commons, ortofota a laseru ČÚZK.",
   "spec": {
-   "wc": [176, 178, 180],
-   "rc": [150, 152, 154],
+   "wc": [
+    176,
+    178,
+    180
+   ],
+   "rc": [
+    150,
+    152,
+    154
+   ],
    "r": "flat",
    "h": 7.2,
    "win": 3
@@ -356,8 +526,16 @@
   "text": "Hotel Černigov (J. Zídka, 70. léta): bílá desková věž ~55 m na nízké podnoži, nejvyšší budova města. V datech jen podnož, věž podle ortofota a fotek z archiweb.cz.",
   "spec": {
    "lm": "cernigov",
-   "wc": [228, 226, 220],
-   "rc": [150, 152, 154],
+   "wc": [
+    228,
+    226,
+    220
+   ],
+   "rc": [
+    150,
+    152,
+    154
+   ],
    "r": "flat",
    "h": 6.5,
    "win": 3,
@@ -371,8 +549,16 @@
   "text": "Studijní a vědecká knihovna (Projektil, 2008): pohledový beton ve tvaru X, rozházená kruhová okna, zlatavé lamely nad vstupem. Podle fotek z archiweb.cz a tzb-info.cz.",
   "spec": {
    "lm": "knihovna",
-   "wc": [190, 188, 182],
-   "rc": [150, 150, 148],
+   "wc": [
+    190,
+    188,
+    182
+   ],
+   "rc": [
+    150,
+    150,
+    148
+   ],
    "r": "flat",
    "h": 17.4,
    "win": 2
@@ -384,8 +570,16 @@
   "lon": 15.828813,
   "text": "Městské lázně (1931–33): bílá funkcionalistická stavba s pásovými okny, hranolová věž s nápisem a prosklená střecha bazénové haly. Podle fotky z aroundus.com a ortofota ČÚZK.",
   "spec": {
-   "wc": [236, 234, 226],
-   "rc": [176, 190, 198],
+   "wc": [
+    236,
+    234,
+    226
+   ],
+   "rc": [
+    176,
+    190,
+    198
+   ],
    "r": "flat",
    "h": 12.0,
    "win": 3,
@@ -396,8 +590,16 @@
      "h": 16,
      "top": "pyramid",
      "to": 16.4,
-     "tc": [230, 228, 222],
-     "wc": [238, 236, 230]
+     "tc": [
+      230,
+      228,
+      222
+     ],
+     "wc": [
+      238,
+      236,
+      230
+     ]
     }
    ]
   }
@@ -409,11 +611,31 @@
   "text": "Regionální centrála ČSOB (Projektil + Roman Brychta, 2021): zaoblená hmota, tmavé sklo mezi bílými pásy podlaží, zelená střecha s atrii. Podle fotek z archiweb.cz a denarchitektury.cz.",
   "spec": {
    "lm": "csob",
-   "wc": [58, 66, 78],
-   "rc": [96, 128, 80],
+   "wc": [
+    58,
+    66,
+    78
+   ],
+   "rc": [
+    96,
+    128,
+    80
+   ],
    "r": "flat",
    "h": 15.2,
    "win": 3
+  }
+ },
+ {
+  "name": "Křižovatka Mileta",
+  "lat": 50.20125,
+  "lon": 15.8325,
+  "text": "Křižovatka okruhu (Sokolská) s Hradeckou a Zborovskou po přestavbě ŘSD, města a kraje (jaro 2024 – říjen 2026, nová křižovatka v provozu od konce dubna 2026): čtyři podchody pro chodce a cyklisty, tři bypassy pro odbočení vpravo a „malá Mileta“, která propojuje okruh, fakultní nemocnici a třídu E. Beneše. Tvar vozovek podle OpenStreetMap (zmapováno 9/2026), pasport magistrátu má ještě stav před přestavbou.",
+  "spec": {
+   "only": 1,
+   "lm": "mileta_podchody",
+   "h": 2,
+   "w": 14
   }
  }
 ]

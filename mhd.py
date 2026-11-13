@@ -9,7 +9,7 @@ python mhd.py [--stahnout]   stáhne build/gtfs.zip (při --stahnout nebo když 
 Krajské GTFS (např. IDS JMK) se ořízne: jen autobusy a tramvaje, jejichž trasa vede územím mapy.
 Prohlížeč z toho podle skutečného času dopočítá, kde je každé vozidlo. Bez mhd.gtfs skript nic neudělá.
 """
-import csv, io, json, os, subprocess, sys, time, zipfile
+import csv, io, json, math, os, subprocess, sys, time, zipfile
 import shapely
 from nastroje.gtfs_casy import cekani_na_konecne, dopln_mezicasy
 from geo import CHUNKS, HALF, MESTO, chunk_center, to_local
@@ -71,12 +71,69 @@ if 'shapes.txt' not in zf.namelist():                      # GTFS bez tvarů tra
     near = AREA.buffer(300)
     trips = [t for t in trips if any(near.contains(shapely.Point(SXY[z[4]])) for z in st.get(t['trip_id'], []) if z[4] in SXY)]
     R = road_route.Graph('data_all/segment.parquet')
-    syn = {}
+    # referenční trasy linek (assets/mhd_trasy_ref.json: relace z OSM, mapa linek dopravce/města; assets/mhd_trasy_rucne.json:
+    # ruční průjezdní čáry): trasa vede přednostně po nich, ne nejkratší cestou; kvalita úseků mezi zastávkami jde do mhd.json
+    REF = json.load(open('assets/mhd_trasy_ref.json', encoding='utf-8')) if os.path.exists('assets/mhd_trasy_ref.json') else {}
+    RUC = json.load(open('assets/mhd_trasy_rucne.json', encoding='utf-8')) if os.path.exists('assets/mhd_trasy_rucne.json') else []
+    _ll = lambda q: [tuple(float(v) for v in to_local(b, a)) for a, b in q]
+    _base = lambda n: (_re.match(r'\d+', n) or [n])[0]
+    _cor = {}
+
+    def koridory(ln):
+        if ln not in _cor:
+            o = [_ll(w) for r in REF.get('osm', []) if r['ref'] in (ln, _base(ln)) for w in r['ways']]
+            m = [_ll(w) for k, ws in REF.get('mesto', {}).items() if k in (ln, _base(ln)) for w in ws]
+            u = [_ll(q['pres']) for q in RUC if q.get('linka') in (ln, _base(ln))]
+            _cor[ln] = {'u': R.koridor(u, 15.0), 'o': R.koridor(o, 16.0), 'm': R.koridor(m, 35.0), 'ma_m': bool(m), 'ma_o': bool(o),
+                        'og': shapely.union_all([shapely.LineString(q) for q in u + o if len(q) > 1]) if u or o else None,
+                        'mg': shapely.union_all([shapely.LineString(q) for q in m if len(q) > 1]) if m else None}
+        return _cor[ln]
+    # polohy zastávek z OSM podle názvu (jízdní řád má jednu souřadnici na název; stejnojmenné zastávky bývají v několika ulicích)
+    _oz = {}
+    for _n, _la, _lo in REF.get('zastavky', []): _oz.setdefault(_n, []).append(tuple(float(v) for v in to_local(_lo, _la)))
+    _mesto0 = MESTO.get('nazev', '') + ', '
+
+    def poloha(z, c):
+        p = SXY[z]; n = SN.get(z, '')
+        n = n[len(_mesto0):] if n.startswith(_mesto0) else n
+        alts = [q for q in _oz.get(n, []) + _oz.get(n.split(', ')[-1], []) if math.dist(q, p) < 500]
+        for g, lim in ((c['og'], 30.0), (c['mg'], 45.0)):
+            if g is None or not alts: continue
+            d, q = min((g.distance(shapely.Point(q)), q) for q in alts)
+            if d <= lim and g.distance(shapely.Point(p)) > d: return q
+        return p
+
+    def kvalita(c, legs, pts):
+        """kód úseku: j jistý (OSM i město, nebo ručně), o jen OSM, m jen město, r rozpor OSM × město, n nejistý, x mimo mapu"""
+        out = []
+        for i, seq in enumerate(legs):
+            if not (AREA.contains(shapely.Point(pts[i])) and AREA.contains(shapely.Point(pts[i + 1]))): out.append('x'); continue
+            if not seq or len(seq) < 2: out.append('n'); continue
+            L = lo = lm = lu = 0.0
+            for a, b in zip(seq, seq[1:]):
+                d = float(np.hypot(*np.subtract(R.xy[a], R.xy[b]))); L += d
+                if a in c['o'] and b in c['o']: lo += d
+                if a in c['m'] and b in c['m']: lm += d
+                if a in c['u'] and b in c['u']: lu += d
+            if L < 120 or lu >= 0.8 * L: out.append('j'); continue
+            fo, fm = lo / L, lm / L
+            if fo >= 0.8 and (fm >= 0.6 or not c['ma_m']): out.append('j')
+            elif fo >= 0.8:                                   # rozpor jen když městská čára vede poblíž jinudy (ne když tu chybí)
+                mid = shapely.Point(R.xy[seq[len(seq) // 2]])
+                out.append('r' if fm < 0.2 and c['mg'] is not None and c['mg'].distance(mid) < 250 else 'o')
+            elif fm >= 0.8: out.append('m')
+            else: out.append('n')
+        return out
+    import numpy as np
+    syn, KVAL = {}, {}
     for t in trips:
         s = [z for z in st[t['trip_id']] if z[4] in SXY]
-        key = tuple(z[4] for z in s)
+        ln = RT[t['route_id']]['route_short_name']
+        key = (ln, tuple(z[4] for z in s))
         if key not in syn:
-            line, dists = R.path([SXY[z] for z in key])
+            c = koridory(ln); pts_ = [poloha(z, c) for z in key[1]]
+            line, dists = R.path(pts_, cor=[(c['u'], 0.1), (c['o'], 0.3), (c['m'], 0.65)])
+            KVAL[len(shapes)] = (kvalita(c, R.legs, pts_), dists)
             syn[key] = (f'syn{len(shapes)}', dists)
             SI[syn[key][0]] = len(shapes); SLEN[syn[key][0]] = (dists[-1] or 1.0, dists[-1] or 1.0)
             shapes.append([[round(a, 1), round(b, 1)] for a, b in shapely.simplify(shapely.LineString(line), 1.0).coords])
@@ -84,6 +141,14 @@ if 'shapes.txt' not in zf.namelist():                      # GTFS bez tvarů tra
         st[t['trip_id']] = [(q, a_, d_, dist, z) for (q, a_, d_, _, z), dist in zip(s, dists)]
     print('trasy dopočítané po silnicích:', len(shapes), 'úseků bez silnice:', R.fails, 'úseků jen bez ohledu na jednosměrky:', R.undirected, 'kruhových objezdů:', R.n_rings)
 TI = {t['trip_id'] for t in trips}; SV = {t['service_id'] for t in trips}
+# nejisté úseky tvarů pro prohlížeč: {tvar: [[od m, do m, kód], …]} (jen úseky, které nejsou 'j')
+kval = {}
+for _sh, (_k, _d) in (KVAL.items() if 'KVAL' in globals() else []):
+    _r = [[round(_d[i]), round(_d[i + 1]), c] for i, c in enumerate(_k) if c not in 'jx' and i + 1 < len(_d)]
+    if _r: kval[str(_sh)] = _r
+if 'KVAL' in globals():
+    from collections import Counter as _C
+    print('kvalita úseků tras:', dict(_C(c for _k, _d in KVAL.values() for c in _k)))
 st = {k: [(q, a_, d_, dist, SN.get(z, '')) for q, a_, d_, dist, z in v] for k, v in st.items() if k in TI}
 routes, RI = [], {}
 for rid in dict.fromkeys(t['route_id'] for t in trips):
@@ -176,6 +241,6 @@ for _sh in sorted({q[1] for q in out if routes[q[0]][1] == 0 and len(q) > 7 and 
         if len(_vyber) == 2: break
     if _vyber: odstav[str(_sh)] = [[[round(float(_a), 1), round(float(_b), 1)] for _a, _b in _o] for _o in _vyber]
 print('tvarů s odstavem na konečné', len(odstav))
-json.dump({'routes': routes, 'shapes': shapes, 'services': services, 'trips': out, 'names': names, 'odstav': odstav, 'stops': stops,
+json.dump({'routes': routes, 'shapes': shapes, 'services': services, 'trips': out, 'names': names, 'odstav': odstav, 'stops': stops, 'kvalita': kval,
            'feed': next(iter(T('feed_info')), {}).get('feed_version', '') if 'feed_info.txt' in zf.namelist() else time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime(Z)))}, open('site/mhd.json', 'w', encoding='utf-8'), separators=(',', ':'), ensure_ascii=False)
 print('linek', len(routes), 'tras', len(shapes), 'spojů', len(out), 'kB', os.path.getsize('site/mhd.json') // 1000)

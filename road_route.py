@@ -6,6 +6,8 @@ na rozdělené silnici (dva pásy) jede autobus po pásu ve svém směru. Zastá
 (oba pásy, obě strany křižovatky); vybere se ta posloupnost, která dá nejkratší jízdu (Viterbi přes zastávky).
 Zastávka mimo mapu: po silnici k uzlu nejblíž k ní (okraj mapy), dál rovně (to už prohlížeč nekreslí).
 Když po jednosměrkách cesta není (chyba v datech), zkusí se bez nich; bez cesty vede úsek rovně.
+Koridory (volitelně, path(..., cor=[(uzly, násobek ceny)])): hrany, jejichž oba konce leží v koridoru (např. podél
+trasy linky z OSM nebo z mapy dopravce), jsou levnější, takže trasa vede skutečnými ulicemi linky, ne nejkratší cestou.
 """
 import heapq
 import numpy as np
@@ -47,6 +49,9 @@ class Graph:
         rows = []
         for r in t:
             c = COST.get(r['class'])
+            # pěší zóna s povoleným vjezdem autobusů/trolejbusů (např. náměstí před nádražím) patří do grafu MHD
+            if r['class'] == 'pedestrian' and any(a.get('access_type') in ('allowed', 'designated') and set((a.get('when') or {}).get('mode') or []) & {'bus', 'psv', 'trolleybus'}
+                                                  for a in (r['access_restrictions'] or [])): c = 1.2
             if r['subtype'] != 'road' or c is None: continue
             g = transform(lambda x, y, z=None: to_local(x, y), shapely.from_wkb(r['geometry']))
             for ls in getattr(g, 'geoms', [g]): rows.append((ls, c, oneway(r['access_restrictions']), r['class']))
@@ -72,6 +77,7 @@ class Graph:
                 self.adj_u[a].append((b, w)); self.adj_u[b].append((a, w))
         self.arr = np.array(self.xy) if self.xy else np.zeros((0, 2))
         self.fails = self.undirected = 0
+        self._cor = []
         self.n_rings = len(rings)
 
     def node(self, p):
@@ -79,6 +85,13 @@ class Graph:
         if k not in self.idx:
             self.idx[k] = len(self.xy); self.xy.append((float(p[0]), float(p[1]))); self.adj.append([]); self.adj_u.append([])
         return self.idx[k]
+
+    def koridor(self, lines, r=10.0):
+        """množina uzlů grafu do r m od čar [[(x, y), …], …]"""
+        if not hasattr(self, '_ntree'): self._ntree = shapely.STRtree(shapely.points(self.arr))
+        ls = [shapely.LineString(q) for q in lines if len(q) >= 2]
+        if not ls: return set()
+        return set(int(i) for i in self._ntree.query(shapely.union_all([l.buffer(r, quad_segs=2) for l in ls]), predicate='intersects'))
 
     def cands(self, p, far=False):
         """{uzel: vzdálenost} kandidátů zastávky do SNAP m (far=True: aspoň nejbližší uzel, i když je dál)"""
@@ -96,18 +109,32 @@ class Graph:
         a0 = np.mean([self.xy[u] for u in src], axis=0); b0 = np.mean([self.xy[u] for u in dst], axis=0)
         lim = min(src.values()) + 4 * float(np.hypot(*(a0 - b0))) + 500   # objížďka nejvýš ~4×
         left = set(dst)
+        cor = self._cor
         while q and left:
             d, u = heapq.heappop(q)
             if d > dist.get(u, 1e18): continue
             if d > lim: break
             left.discard(u)
             for v, w in adj[u]:
+                for S, fa in cor:
+                    if u in S and v in S: w *= fa; break
                 if d + w < dist.get(v, 1e18): dist[v] = d + w; prev[v] = u; heapq.heappush(q, (d + w, v))
         return {u: dist[u] for u in dst if u not in left}, prev
 
-    def path(self, stops):
-        """lomená čára přes zastávky [(x, y)] a vzdálenost každé zastávky po ní"""
+    def path(self, stops, cor=()):
+        """lomená čára přes zastávky [(x, y)] a vzdálenost každé zastávky po ní; self.legs = uzly úseků (None = rovně)"""
+        self._cor = list(cor)
         near = [self.cands(p) for p in stops]
+        # s koridorem trasy linky: kandidáti zastávky jen na koridoru (do 150 m), ať trasa nedělá výběžky do vedlejších
+        # ulic kvůli nepřesné poloze zastávky v jízdním řádu
+        S = set().union(*[c for c, fa in self._cor if fa <= 0.3]) if self._cor else set()
+        if S:
+            for i, p in enumerate(stops):
+                d = np.hypot(self.arr[:, 0] - p[0], self.arr[:, 1] - p[1])
+                ok = [int(k) for k in np.flatnonzero(d <= 150) if int(k) in S]
+                if ok:
+                    dm = min(d[k] for k in ok)
+                    near[i] = {k: float(d[k]) for k in sorted(ok, key=lambda k: d[k])[:60] if d[k] <= dm + CAND}
         cand = [c if c or not any(q for q in near[max(i - 1, 0):i + 2]) else self.cands(stops[i], True)
                 for i, c in enumerate(near)]
         # Viterbi: pro každou zastávku ceny dosažených kandidátů a zpětné ukazatele (předchůdci z Dijkstry daného úseku)
@@ -158,4 +185,5 @@ class Graph:
                 if not near[i]: add(stops[i])               # dál mimo mapu rovně
             dists.append(L)
         if len(line) < 2: line.append((line[0][0] + 0.1, line[0][1]))
+        self.legs = pts[1:]
         return line, dists

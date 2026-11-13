@@ -248,6 +248,23 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
                 hit[s_] = _ztc[key][rr, cc]
             hit = hit.reshape(GX.shape) & PAVED[rb:rb + GX.shape[0]]
             S[rb:rb + GX.shape[0]][hit] = C['marking']
+        # 5b) pod mostovkou (výš než 1 m nad terénem) povrch z doby před pasportem: plocha vozovky a chodníku na mostě
+        #     se jinak namaluje i na zem, vodu nebo koleje pod ním (silnice z OSM se pod mosty nekreslí už v prep.py)
+        _under_d = []
+        for D in DECKS:
+            _xy = np.array(D[0].coords)[:, :2]; _hi = (np.asarray(D[2]) - np.asarray(D[3])) > 1.0
+            if len(_xy) != len(_hi): continue
+            _run = []
+            for q_, h_ in zip(_xy, _hi):
+                if h_: _run.append(tuple(q_))
+                elif _run:
+                    if len(_run) > 1: _under_d.append(LineString(_run).buffer(D[4] / 2 + 0.3, cap_style='flat'))
+                    _run = []
+            if len(_run) > 1: _under_d.append(LineString(_run).buffer(D[4] / 2 + 0.3, cap_style='flat'))
+        if _under_d:
+            _um = _mask(shapely.unary_union(_under_d).intersection(_MM_PIL))
+            S[_um] = ORIG[_um]
+            print('MMHK: pod mostovkami vrácen původní povrch px', int(_um.sum()))
         cls.paste(Image.fromarray(_A))
         # 6) lampy veřejného osvětlení místo odhadnutých po 34 m
         _n0 = len(props['lamp'])

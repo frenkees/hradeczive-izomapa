@@ -129,6 +129,10 @@ Ukazuj uživateli výřezy před a po.
   budov bez typu.
 - mosty a lávky: úsek s `is_bridge` (OSM/Overture) delší než 8 m se nemaluje do terénu, ale je 3D mostovka (`scene.bridges`):
   nad cestou nebo tratí pod mostem zvednutá na 5,2 m (trať 6 m), nad vodou trochu nad hladinu, v rozpětí horní konvexní obálka (bez propadů).
+  Opěry: úroveň navazující cesty do 40 m před mostem (laser má pod mostem břeh), mezi opěrami vede mostovka přímo; most přes řeku je tak v rovině
+  silnice a končí na břehu. Podjezdná výška se měří od terénu cesty pod mostem (pěšině stačí 3 m); křížení ve společném uzlu sítě je úrovňové.
+  Nájezd nepokračuje přes křižovatku; konec mostu z dat, který leží na terénu, se vrací mezi cesty. Plot nebo zábradlí z dat v pásu mostovky
+  a nad vodou se nekreslí (`on_bridge`).
   Nájezdy (žádné „skokánky“): mostovka pokračuje do navazující cesty stejného druhu (i když most končí uprostřed segmentu, až 8 kusů / 200 m)
   a výška nad terénem klesá nejvýš o `GRADE` (silnice 6 %, trať 3 %, lávka 8 %) – nájezd tak kopíruje svah. Ta část cesty se pak
   nekreslí do terénu (auta jedou po mostovce). Navazující kusy jednoho mostu se nejdřív spojí (linemerge). Bez navazující cesty

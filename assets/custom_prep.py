@@ -363,14 +363,15 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             print('MMHK: přestavby', [p['nazev'] for p in _PRE], 'cest z OSM', len(_PRE_W), 'přechodů', len(_zb) // 6)
         # 5a2) chodník a cyklostezka silničního mostu jsou součást mostní konstrukce: v pasportu je to plocha nad vodou těsně
         #      vedle mostovky (v OSM bývá chodník zvlášť a mostovka z dat má jen šířku vozovky). Mostovka se o ni rozšíří
-        #      a osa se posune k chodníku, ať pás chodníku nezůstane namalovaný na hladině.
+        #      a osa se posune k chodníku, ať pás chodníku nezůstane namalovaný na hladině. Stejně lávka: v datech má šířku
+        #      pěšiny, v pasportu je to širší plocha (okraje by zůstaly namalované pod lávkou jako dvě čáry do vody).
         _wsh = _MM_W.buffer(-0.5)
         _foot_rd = [D[0].buffer(D[4] / 2, cap_style='flat') for D in DECKS if D[5] == 'road']
         _Usw = U.intersection(_wsh).difference(shapely.unary_union(_foot_rd)) if _foot_rd and not U.is_empty else Polygon()
         _Uswp = shapely.prepared.prep(_Usw)
         _nwid = 0
         for _di, D in enumerate(DECKS):
-            if D[5] != 'road' or _Usw.is_empty or not (len(D) > 8 and D[8]): continue
+            if D[5] == 'rail' or _Usw.is_empty or not (len(D) > 8 and D[8]): continue
             _xy = np.array(D[0].coords)[:, :2]; _z = np.asarray(D[2]); _g = np.asarray(D[3])
             if len(_xy) != len(_z) or len(_xy) < 3: continue
             _nrm = np.zeros_like(_xy)
@@ -393,20 +394,20 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             if not (eL or eR): continue
             _sh = (eL - eR) / 2
             DECKS[_di] = (LineString(_xy + _nrm * _sh), D[1], D[2], D[3], round(D[4] + eL + eR, 2), *D[5:]); _nwid += 1
-        if _nwid: print('MMHK: silničních mostů rozšířených o chodník z pasportu', _nwid)
+        if _nwid: print('MMHK: mostů a lávek rozšířených o chodník z pasportu', _nwid)
         # 5b) pod mostovkou (výš než 1 m nad terénem) povrch z doby před pasportem: plocha vozovky a chodníku na mostě
         #     se jinak namaluje i na zem, vodu nebo koleje pod ním (silnice z OSM se pod mosty nekreslí už v prep.py)
         _under_d = []
-        for D in DECKS:
+        for D in DECKS + list(globals().get('DECKS_SKRYTE', [])):       # i pod vlastním modelem mostu (mostovka z dat je skrytá)
             _xy = np.array(D[0].coords)[:, :2]; _hi = (np.asarray(D[2]) - np.asarray(D[3])) > 1.0
             if len(_xy) != len(_hi): continue
             _run = []
             for q_, h_ in zip(_xy, _hi):
                 if h_: _run.append(tuple(q_))
                 elif _run:
-                    if len(_run) > 1: _under_d.append(LineString(_run).buffer(D[4] / 2 + 0.3, cap_style='flat'))
+                    if len(_run) > 1: _under_d.append(LineString(_run).buffer(D[4] / 2 + 0.8, cap_style='flat'))
                     _run = []
-            if len(_run) > 1: _under_d.append(LineString(_run).buffer(D[4] / 2 + 0.3, cap_style='flat'))
+            if len(_run) > 1: _under_d.append(LineString(_run).buffer(D[4] / 2 + 0.8, cap_style='flat'))
         if _under_d:
             _um = _mask(shapely.unary_union(_under_d).intersection(_MM_PIL))
             S[_um] = ORIG[_um]
@@ -422,13 +423,48 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
         _n0 = len(props['lamp'])
         props['lamp'] = [l_ for l_ in props['lamp'] if not _MM_PILP.contains(Point(l_[0], l_[1])) or _PRE_ZP.contains(Point(l_[0], l_[1]))]
         _nr = _n0 - len(props['lamp']); _nl = 0
+        # lampy mostu stojí v pasportu na okraji mostu, tedy nad vodou nebo nad břehem pod mostem -> postavit na mostovku (její výška,
+        # nejdál k jejímu okraji). Jisté jsou lampy nad vodou; lampa nad břehem patří k mostu, když stojí ve stejné řadě (stejný odstup
+        # od osy) jako některá jistá – jinak je to lampa cesty pod mostem. Lampa nad vodou mimo mostovky se nekreslí.
+        _dkl = []
+        for D in DECKS:
+            _c = np.array(D[0].coords)[:, :2]
+            if len(_c) == len(D[2]) and len(D) > 8 and D[8]:
+                _dkl.append((D, np.concatenate([[0], np.cumsum(np.hypot(*np.diff(_c, axis=0).T))])))
+        _dkt = shapely.STRtree([D[0] for D, _c in _dkl]) if _dkl else None
+        _w05, _w20 = shapely.prepared.prep(_MM_W.buffer(-0.5)), shapely.prepared.prep(_MM_W.buffer(-2.0))
+
+        def _on_deck(q, lim):                          # (vzdálenost, mostovka, odstup od osy se znaménkem, x, y, výška) nebo None
+            best = None
+            for k in (_dkt.query(q, predicate='dwithin', distance=12.0) if _dkt is not None else []):
+                D, cum = _dkl[int(k)]; hw = D[4] / 2
+                dist = D[0].distance(q)
+                if dist > hw + lim or (best is not None and dist >= best[0]): continue
+                s_ = D[0].project(q); zd = float(np.interp(s_, cum, D[2]))
+                if zd - float(np.interp(s_, cum, D[3])) < 1.0: continue          # jen nad terénem (ne nájezd na zemi)
+                f = D[0].interpolate(s_); f2 = D[0].interpolate(min(s_ + 1.0, D[0].length)); f1 = D[0].interpolate(max(s_ - 1.0, 0.0))
+                sg = 1.0 if (f2.x - f1.x) * (q.y - f.y) - (f2.y - f1.y) * (q.x - f.x) >= 0 else -1.0
+                k_ = min(1.0, max(hw - 0.4, 0.0) / dist) if dist > 1e-6 else 1.0
+                best = (dist, int(k), sg * dist, f.x + (q.x - f.x) * k_, f.y + (q.y - f.y) * k_, zd)
+            return best
+        _rows, _wait, _nm, _nw = [], [], 0, 0
         for l_ in _MMHK['lampy']:
             if l_['typ'] == 'reflektor': continue
             x, y = (float(v) for v in to_local(l_['lon'], l_['lat']))
             q = Point(x, y)
             if not (AREA.contains(q) and _MM_PILP.contains(q)) or _PRE_ZP.contains(q): continue
-            nd_ = nearest_dir(q, all_tree, all_lines, 15)
-            props['lamp'].append([x, y, float(ground(x, y)), nd_[0] if nd_ else 0.0]); _nl += 1
+            nd_ = nearest_dir(q, all_tree, all_lines, 15); a_ = nd_[0] if nd_ else 0.0
+            inw = _w05.contains(q); r_ = _on_deck(q, 4.0 if inw else 3.0)
+            if inw and r_ is not None:
+                _rows.append((r_[1], r_[2])); props['lamp'].append([r_[3], r_[4], r_[5], a_]); _nl += 1; _nm += 1
+            elif r_ is not None: _wait.append((x, y, a_, r_))
+            elif _w20.contains(q): _nw += 1
+            else: props['lamp'].append([x, y, float(ground(x, y)), a_]); _nl += 1
+        for x, y, a_, r_ in _wait:
+            if any(di == r_[1] and abs(o - r_[2]) < 1.2 for di, o in _rows): props['lamp'].append([r_[3], r_[4], r_[5], a_]); _nm += 1
+            else: props['lamp'].append([x, y, float(ground(x, y)), a_])
+            _nl += 1
+        if _nm or _nw: print('MMHK: lamp postavených na mostovku', _nm, 'nad vodou mimo most vynecháno', _nw)
         # 7) zaparkovaná auta na skutečných stáních (řady stání ze značení); odhadnutá auta u ulic v oblasti pryč
         _stn = [s for s in _MMHK['stani'] if _mm_inbb([[s[0], s[1]]]) and not _PRE_ZP.contains(Point(*_mm_xy([[s[0], s[1]]])[0]))]
         _sxy = _mm_xy([[s[0], s[1]] for s in _stn]) if _stn else np.zeros((0, 2))
@@ -449,8 +485,23 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             if not AREA.contains(Point(x, y)): continue
             cars.append([round(float(x), 2), round(float(y), 2), round(float(ground(x, y)), 2), round(math.atan2(y2 - y, x2 - x), 3),
                          int(h01('car' + wkey(x, y)) * 8) % 8]); _nca += 1
-        # 8) zábradlí (DTMM), ne na mostech a nad vodou; na nábřežní zdi o římsu výš
+        # 8) zábradlí (DTMM), ne na mostech a nad vodou; na nábřežní zdi o římsu výš. Zábradlí mostu vede v pasportu i nad břehem
+        #    pod mostem (na terénu by sbíhalo po svahu do vody): část v pásu mostovky nad terénem a část nad vodou se vynechá,
+        #    mostovka má vlastní zábradlí
         _decks = shapely.STRtree([D[0] for D in DECKS]) if DECKS else None
+        _dk8 = []
+        for D in DECKS + list(globals().get('DECKS_SKRYTE', [])):
+            _c = np.array(D[0].coords)[:, :2]
+            if len(_c) == len(D[2]): _dk8.append((D, np.concatenate([[0], np.cumsum(np.hypot(*np.diff(_c, axis=0).T))])))
+        _dk8t = shapely.STRtree([D[0] for D, _c in _dk8]) if _dk8 else None
+        _w15 = shapely.prepared.prep(_MM_W.buffer(-1.5))
+
+        def _na_moste(x, y, zg):                       # bod zábradlí patří mostu: v pásu mostovky, která je tam aspoň 1,5 m nad terénem bodu
+            q = Point(x, y)
+            for k in (_dk8t.query(q, predicate='dwithin', distance=14.0) if _dk8t is not None else []):
+                D, cum = _dk8[int(k)]
+                if D[0].distance(q) <= D[4] / 2 + 4.0 and float(np.interp(D[0].project(q), cum, D[2])) - zg > 1.5: return True
+            return False
         _rw = shapely.prepared.prep(shapely.unary_union([w.buffer(2.5) for w, _s in _MM_RIVW])) if _MM_RIVW else None
         _nz = 0
         for q in _MMHK['zabradli']:
@@ -462,8 +513,16 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
                 l = l.segmentize(2.5); P_ = np.array(l.coords)[:, :2]
                 d_ = np.gradient(P_, axis=0); n_ = np.stack([-d_[:, 1], d_[:, 0]], 1); n_ /= np.linalg.norm(n_, axis=1, keepdims=True) + 1e-9
                 z_ = np.maximum(ground(*(P_ + n_ * 1.2).T), ground(*(P_ - n_ * 1.2).T))
-                if _rw is not None and _rw.contains(m_): z_ = z_ + 0.6
-                lines_out['fence'].append([[round(float(x), 2), round(float(y), 2), round(float(zz), 2)] for (x, y), zz in zip(P_, z_)]); _nz += 1
+                _wall = _rw is not None and _rw.contains(m_)
+                if _wall: z_ = z_ + 0.6
+                _zg = ground(P_[:, 0], P_[:, 1])
+                _ok = [not ((not _wall and _w15.contains(Point(x, y))) or _na_moste(x, y, float(g_))) for (x, y), g_ in zip(P_, _zg)]
+                _run = []
+                for (x, y), zz, ok in list(zip(P_, z_, _ok)) + [((0, 0), 0, False)]:
+                    if ok: _run.append([round(float(x), 2), round(float(y), 2), round(float(zz), 2)])
+                    else:
+                        if len(_run) > 1: lines_out['fence'].append(_run); _nz += 1
+                        _run = []
         print('MMHK: povrchů', len(_MM_POV), 'zeleně', len(_MM_ZEL), 'značení px', int((S == C['marking']).sum()),
               'lamp', _nl, 'místo', _nr, '| aut na stáních', _nca, 'odebráno', _ncr, '| zábradlí', _nz)
 

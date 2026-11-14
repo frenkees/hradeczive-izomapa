@@ -69,6 +69,9 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             for _w in _p.get('osm', {}).get('ways', []):
                 _t = _w['t']; _h = _t.get('highway')
                 if 'area:highway' in _t or not _h: continue
+                # silnice ve výstavbě (nové ulice u malé Milety): pasport magistrátu je už má, za hranicí zóny se kreslí
+                # z pasportu -> v zóně kreslit taky, jinak by přes silnici na hranici zóny vedl pruh trávy
+                if _h == 'construction' and _t.get('construction') in _PRE_CAR: _h = _t['construction']
                 if _t.get('tunnel') or _t.get('covered') == 'yes' or _t.get('layer', '0').startswith('-'): continue
                 if _h in ('proposed', 'construction', 'platform', 'corridor', 'elevator'): continue
                 _l = LineString(_mm_xy(_w['q']))

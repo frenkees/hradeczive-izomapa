@@ -741,5 +741,33 @@
     ]
    ]
   }
+ },
+ {
+  "name": "Nový most plk. Šrámka ve Svinarech",
+  "lat": 50.215794,
+  "lon": 15.908074,
+  "text": "Ocelový obloukový silniční most přes Orlici ve Svinarech, první most po proudu Orlice na území Hradce Králové. Původní železný most z roku 1907 (po dřevěném mostu z roku 1869, který strhla povodeň v roce 1891) byl od ledna 2017 pro havarijní stav uzavřen; nový dvouproudý most byl otevřen v květnu 2019. Pojmenován je po českém legionáři a svinarském rodáku plk. Bohumilu Janu Šrámkovi. Model podle volně licencovaných fotek z Wikimedia Commons; rozměry oblouků jsou odhad.",
+  "spec": {
+   "only": 1,
+   "lm": "most_sramek",
+   "w": 8,
+   "h": 12,
+   "top": 12,
+   "cls": "most",
+   "os": [
+    [
+     50.216249,
+     15.907822
+    ],
+    [
+     50.215794,
+     15.908074
+    ],
+    [
+     50.215381,
+     15.908323
+    ]
+   ]
+  }
  }
 ]

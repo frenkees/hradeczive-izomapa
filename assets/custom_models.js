@@ -814,4 +814,41 @@ export const landmarks = {
     }
     return true;
   },
+
+  // Nový most plk. Šrámka ve Svinarech přes Orlici (otevřen 2019, ocelový obloukový silniční most): dva modré oblouky po stranách
+  // vozovky (mírně nakloněné dovnitř), z nich svislá závěsná lana k mostovce. Mostovku, vozovku a zábradlí kreslí data; model
+  // přidává jen oblouky a závěsy. Osa a výška mostovky: b.os z prep.py. Rozpětí oblouku ~62 m, vzepětí ~10 m (odhad z fotek).
+  // Předlohy: landmarks_ref/sramek_most.
+  most_sramek(b, { X, pushQuad, tv }) {
+    const os = b.os; if (!os || os.length < 2) return true;
+    let cx = 0, cy = 0; for (const [x, y] of b.p) { cx += x / b.p.length; cy += y / b.p.length; }
+    const g = b.g, solid = [0, 1, 0, 0];
+    const BLUE = C(28, 112, 196), BLUE2 = C(18, 84, 160), CABLE = C(214, 218, 222);
+    const n = os.length, P = os.map(([dx, dy, dz]) => [cx + dx, cy + dy, g + dz]);
+    const tan = P.map((p, i) => { const a = P[Math.max(0, i - 1)], c = P[Math.min(n - 1, i + 1)], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1; return [(c[0] - a[0]) / l, (c[1] - a[1]) / l]; });
+    const xyz = (i, t, h) => [P[i][0] - tan[i][1] * t, P[i][1] + tan[i][0] * t, P[i][2] + h];     // t > 0 = vlevo po směru osy
+    const bar = (A, B, r, col, aw = solid) => {
+      const d = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], l = Math.hypot(...d) || 1, u = d.map((v) => v / l);
+      let p1 = [-u[1], u[0], 0]; const m = Math.hypot(p1[0], p1[1]); p1 = m < 0.2 ? [1, 0, 0] : [p1[0] / m, p1[1] / m, 0];
+      const p2 = [u[1] * p1[2] - u[2] * p1[1], u[2] * p1[0] - u[0] * p1[2], u[0] * p1[1] - u[1] * p1[0]];
+      const q = (p, s1, s2) => tv(p[0] + (p1[0] * s1 + p2[0] * s2) * r, p[1] + (p1[1] * s1 + p2[1] * s2) * r, p[2] + (p1[2] * s1 + p2[2] * s2) * r);
+      const c = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+      for (let k = 0; k < 4; k++) { const [a1, a2] = c[k], [b1, b2] = c[(k + 1) % 4]; pushQuad(X, q(A, a1, a2), q(A, b1, b2), q(B, b1, b2), q(B, a1, a2), col, aw); }
+    };
+    const s = [0]; for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+    const Ltot = s[n - 1], SP = Math.min(62, Ltot * 0.7), s0 = (Ltot - SP) / 2, RISE = 10.0, T0 = 4.35, LEAN = 0.18;
+    const u = (i) => (s[i] - s0) / SP;                          // 0..1 po délce oblouku
+    const arch = (i) => { const w = 4 * u(i) * (1 - u(i)); return [w * RISE, T0 - LEAN * w * RISE]; };   // [výška, odstup od osy]
+    for (let i = 0; i < n - 1; i++) {
+      if (u(i) < -1e-6 || u(i + 1) > 1 + 1e-6) continue;
+      const a = arch(i), c = arch(i + 1);
+      for (const sd of [-1, 1]) bar(xyz(i, sd * a[1], a[0] + 0.3), xyz(i + 1, sd * c[1], c[0] + 0.3), 0.55, i % 2 ? BLUE : BLUE2);
+    }
+    for (let i = 0; i < n; i++) {                               // závěsná lana po ~5,8 m
+      if (u(i) <= 0.03 || u(i) >= 0.97 || i % 2) continue;
+      const a = arch(i);
+      for (const sd of [-1, 1]) bar(xyz(i, sd * a[1], a[0] + 0.3), xyz(i, sd * T0, 0.9), 0.035, CABLE);
+    }
+    return true;
+  },
 };

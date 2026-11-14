@@ -760,6 +760,45 @@ if UP.get('skryt_mosty'):
     DECKS = [q for q in DECKS if not any(q[0].distance(p_) < 12 for p_ in _sk)]
     if _n0 > len(DECKS): print('skrytých mostů z dat (vlastní model)', _n0 - len(DECKS))
 print('mostů', len(DECKS), 'z toho lávek', sum(k[5] == 'foot' for k in DECKS), 'nájezdů', len(_rcut))
+# zářez pod mostem v násypu: laser má nad křížením mostovku, ne cestu pod ní. Terén pod mostovkou podél cesty pod mostem (silnice, trať, pěšina,
+# ne voda) klesne na přímku mezi výškami cesty 12 m před mostem a za mostem (jen dolů). Mostovka pak nesedí na násypu jen 1–2 m nad terénem
+# (v render.html by to byl zemní násyp bez průjezdu) a cesta pod mostem nestoupá přes hrb. Výška terénu pod mostovkou (gz) se přepočte.
+_nc = 0; _DK = []
+for _D in DECKS:
+    _lz, _dd, _zz, _gz, _w, _kd, _c, _nm, _wt = _D
+    _fp = _lz.buffer(_w / 2 + 1.0)
+    for _j in _under.query(_fp):
+        _cg = _under.geometries[_j]
+        if _cg.distance(_lz) > 0.5: continue
+        if is_node(_cg.intersection(_lz)): continue
+        _wi = lines(_cg.intersection(_fp))
+        if not _wi: continue
+        _wi = max(_wi, key=lambda q_: q_.length)
+        # osa cesty pod mostem v pořadí od jednoho konce průniku k druhému, prodloužená o 12 m na obě strany
+        _s0, _s1 = sorted((_cg.project(Point(_wi.coords[0])), _cg.project(Point(_wi.coords[-1]))))
+        if _s1 - _s0 < 3.0: continue
+        _a0, _a1 = max(0.0, _s0 - 12.0), min(_cg.length, _s1 + 12.0)
+        _pa, _pb = _cg.interpolate(_a0), _cg.interpolate(_a1)
+        _z0, _z1 = float(ground(_pa.x, _pa.y)), float(ground(_pb.x, _pb.y))
+        _sub = shapely.ops.substring(_cg, _a0, _a1)
+        _hw = max(roads[int(_j)][3] if len(roads[int(_j)]) > 3 else 3.0, 3.0) / 2 + 1.5
+        if _gpt is None: _gpt = shapely.points(gx.ravel(), gy.ravel()).reshape(gx.shape)
+        _bb = _sub.buffer(_hw + 5.0).bounds
+        _m = (gx >= _bb[0]) & (gx <= _bb[2]) & (gy >= _bb[1]) & (gy <= _bb[3])
+        if not _m.any(): continue
+        _pp = _gpt[_m]
+        _t = np.clip(shapely.line_locate_point(_sub, _pp) / max(_sub.length, 0.1), 0, 1)
+        _d = shapely.distance(_pp, _sub)
+        _zt = _z0 + (_z1 - _z0) * _t
+        _wgt = np.clip((_hw + 5.0 - _d) / 5.0, 0, 1)
+        _cur = HX[_m]
+        _hit = _cur > _zt + 0.7
+        if not (_hit & (_wgt > 0)).any(): continue
+        HX[_m] = np.where(_hit, _cur * (1 - _wgt) + _zt * _wgt, _cur); _nc += 1
+    _DK.append(_D)
+if _nc:
+    DECKS = [(q[0], q[1], q[2], np.asarray(ground(*np.array(q[0].coords)[:, :2].T)) if len(q[0].coords) == len(q[3]) else q[3], *q[4:]) for q in DECKS]
+    print('zářezů pod mosty', _nc)
 def _rest(l_, cuts):                       # cesta bez úseků pod mostovkami
     out, a = [], 0.0
     for c0, c1 in sorted(cuts):

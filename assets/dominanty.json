@@ -705,5 +705,41 @@
     }
    ]
   }
+ },
+ {
+  "name": "Estakáda I/31 a skleněný tunel",
+  "lat": 50.21503,
+  "lon": 15.84345,
+  "text": "Estakáda silnice I/31 (městský okruh, Okružní) vede nad Pospíšilovou třídou a mezi činžáky u Pilnáčkovy ulice; postavena byla na přelomu 70. a 80. let. Kvůli hluku a výfukovým plynům u obytných domů ji ŘSD v roce 2008 opatřilo 180 m dlouhým protihlukovým „skleněným“ tunelem (architekt Patrik Kotas, cena kolem 200 mil. Kč): předpjatá ocelová konstrukce se skleněnými deskami, zavěšená na táhlech, hlavní příčná táhla jsou po zhruba 23 m. Z estakády odbočuje plynulý sjezd na Pospíšilovu třídu. Model podle volně licencovaných fotek z Wikimedia Commons, OSM a ortofota ČÚZK.",
+  "spec": {
+   "only": 1,
+   "lm": "estakada_i31",
+   "w": 6,
+   "h": 14,
+   "top": 15,
+   "cls": "most",
+   "os": [
+    [
+     50.21556,
+     15.84255
+    ],
+    [
+     50.21503,
+     15.84348
+    ],
+    [
+     50.2149,
+     15.8437
+    ],
+    [
+     50.21477,
+     15.84391
+    ],
+    [
+     50.21447,
+     15.84431
+    ]
+   ]
+  }
  }
 ]

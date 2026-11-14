@@ -757,4 +757,61 @@ export const landmarks = {
     pushBox(X, fm, -3.6, -2.4, -1.7 - 2.2, -1.7, zm - 0.05, zm + 0.02, WOOD, [0, 1, 0, 0]);              // lávka na břeh
     return true;
   },
+
+  // Estakáda I/31 (Okružní) se skleněným protihlukovým tunelem (ŘSD 2008, arch. Patrik Kotas): 180 m dlouhý tunel nad oběma
+  // jízdními pásy mezi křižovatkou s Pilnáčkovou a nadjezdem nad Pospíšilovou. Skleněné stěny se obloukem zakřivují do střechy,
+  // žebra po ~2,9 m, hlavní příčná táhla po 23 m: venku bílé šikmé stožáry, ze kterých vedou táhla k podélnému nosníku
+  // ve střeše. Osa a výška mostovky: b.os = [[dx, dy, výška nad b.g]] z prep.py (mostovka z dat). Sklo je kresleno proužkově,
+  // aby byla vidět vozovka uvnitř (dlaždice nemají průhlednost). Předlohy: landmarks_ref/estakada_i31.
+  estakada_i31(b, { X, pushQuad, tv }) {
+    const os = b.os; if (!os || os.length < 2) return true;
+    let cx = 0, cy = 0; for (const [x, y] of b.p) { cx += x / b.p.length; cy += y / b.p.length; }
+    const g = b.g, solid = [0, 1, 0, 0], lit = [0.85, 1, 0, 0];
+    const WHITE = C(244, 245, 246), CONC = C(176, 174, 168), GL = C(176, 212, 222), GL2 = C(150, 190, 206), GLR = C(204, 228, 236), LED = C(255, 244, 214), CABLE = C(110, 114, 120);
+    const n = os.length, P = os.map(([dx, dy, dz]) => [cx + dx, cy + dy, g + dz]);
+    const tan = P.map((p, i) => { const a = P[Math.max(0, i - 1)], c = P[Math.min(n - 1, i + 1)], l = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1; return [(c[0] - a[0]) / l, (c[1] - a[1]) / l]; });
+    const xyz = (i, t, h) => [P[i][0] - tan[i][1] * t, P[i][1] + tan[i][0] * t, P[i][2] + h];     // t > 0 = vlevo po směru osy
+    const at = (i, t, h) => tv(...xyz(i, t, h));
+    const lerp3 = (a, b2, u) => [a[0] + (b2[0] - a[0]) * u, a[1] + (b2[1] - a[1]) * u, a[2] + (b2[2] - a[2]) * u];
+    const bar = (A, B, r, col, aw = solid) => {                              // čtyřboký hranol mezi body (x, y, z)
+      const d = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], l = Math.hypot(...d) || 1, u = d.map((v) => v / l);
+      let p1 = [-u[1], u[0], 0]; const m = Math.hypot(p1[0], p1[1]); p1 = m < 0.2 ? [1, 0, 0] : [p1[0] / m, p1[1] / m, 0];
+      const p2 = [u[1] * p1[2] - u[2] * p1[1], u[2] * p1[0] - u[0] * p1[2], u[0] * p1[1] - u[1] * p1[0]];
+      const q = (p, s1, s2) => tv(p[0] + (p1[0] * s1 + p2[0] * s2) * r, p[1] + (p1[1] * s1 + p2[1] * s2) * r, p[2] + (p1[2] * s1 + p2[2] * s2) * r);
+      const c = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+      for (let k = 0; k < 4; k++) { const [a1, a2] = c[k], [b1, b2] = c[(k + 1) % 4]; pushQuad(X, q(A, a1, a2), q(A, b1, b2), q(B, b1, b2), q(B, a1, a2), col, aw); }
+    };
+    // půlprofil (t, výška nad mostovkou) od paty stěny ke hřebeni; stěna mírně ven, pak oblouk do střechy
+    const HP = [[9.7, 0.0], [9.9, 2.5], [10.0, 4.6], [9.2, 6.0], [7.4, 7.3], [4.8, 8.2], [2.2, 8.7], [0.0, 8.85]];
+    const pt = (i, sd, k) => xyz(i, sd * HP[k][0], HP[k][1]);
+    // pata: betonová římsa dolů k mostovce a deska mezi jízdním pásem a stěnou
+    for (let i = 0; i < n - 1; i++) {
+      for (const sd of [-1, 1]) {
+        pushQuad(X, at(i, sd * 7.4, 0.02), at(i + 1, sd * 7.4, 0.02), at(i + 1, sd * 10.3, 0.02), at(i, sd * 10.3, 0.02), CONC, [0, 1, 1, 0]);
+        pushQuad(X, at(i, sd * 10.3, -0.7), at(i + 1, sd * 10.3, -0.7), at(i + 1, sd * 10.3, 0.02), at(i, sd * 10.3, 0.02), CONC, solid);
+        pushQuad(X, at(i, sd * 9.6, 0.02), at(i + 1, sd * 9.6, 0.02), at(i + 1, sd * 9.6, 0.8), at(i, sd * 9.6, 0.8), CONC, solid);
+        // sklo: stěny světle modré, střecha světlejší (odraz oblohy); každá čtvrtá tabule je o odstín tmavší
+        for (let k = 0; k < HP.length - 1; k++) {
+          const col = k >= 3 ? (i % 4 === 0 ? GL : GLR) : (i % 4 === 0 ? GL2 : GL);
+          pushQuad(X, at(...[i, sd * HP[k][0], HP[k][1]]), at(i + 1, sd * HP[k][0], HP[k][1]), at(i + 1, sd * HP[k + 1][0], HP[k + 1][1]), at(i, sd * HP[k + 1][0], HP[k + 1][1]), col, solid);
+        }
+      }
+      bar(xyz(i, 0, 9.3), xyz(i + 1, 0, 9.3), 0.32, WHITE);                  // podélný nosník ve střeše
+      for (const sd of [-1, 1]) bar(xyz(i, sd * 7.1, 7.1), xyz(i + 1, sd * 7.1, 7.1), 0.07, LED, lit);   // osvětlení pod střechou
+    }
+    // žebra po ~2,9 m (hlavní příčná táhla po 8. stanici = ~23 m) a venkovní stožáry
+    for (let i = 0; i < n; i++) {
+      const main = i % 8 === 0;
+      for (const sd of [-1, 1]) for (let k = 0; k < HP.length - 1; k++) bar(pt(i, sd, k), pt(i, sd, k + 1), main ? 0.2 : 0.1, WHITE);
+      if (!main) continue;
+      for (const sd of [-1, 1]) {
+        const base = xyz(i, sd * 11.0, -0.3), top = xyz(i, sd * 12.8, 13.6);
+        bar(base, top, 0.24, WHITE);
+        bar(xyz(i, sd * 10.0, 4.6), xyz(i, sd * 11.9, 8.0), 0.11, WHITE);       // vzpěra stožáru ke stěně
+        for (const j of [i - 3, i, i + 3]) if (j >= 0 && j < n) bar(top, xyz(j, 0, 9.3), 0.045, CABLE);    // táhla k nosníku ve střeše
+        for (const j of [i - 3, i + 3]) if (j >= 0 && j < n) bar(top, xyz(j, sd * 9.2, 6.0), 0.045, CABLE);
+      }
+    }
+    return true;
+  },
 };

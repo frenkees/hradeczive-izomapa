@@ -550,6 +550,7 @@ for l, r in bridge_segs:
 if len(_keep) < len(bridge_segs): print('chodníků sloučených se silničním mostem', len(bridge_segs) - len(_keep))
 bridge_segs = _keep
 DECKS = []                                  # (čára, vzdálenosti, výšky mostovky, výšky terénu, šířka, druh, třída, název)
+bridge_segs.sort(key=lambda it: -it[0].length)   # nejdřív dlouhé mostovky: kratší kusy se na ně v křižovatce napojí ve stejné výšce
 for g0, r in bridge_segs:
     for l in lines(g0):
         if not l.intersects(DRAWBOX): continue
@@ -582,10 +583,21 @@ for g0, r in bridge_segs:
             pt = Point(x, y)
             if cross is not None and cross.contains(pt): req[i] = gz[i] + (6.0 if kind == 'rail' else 5.2)
             elif _water.contains(pt): req[i] = gz[i] + (1.0 if kind == 'foot' else 1.3)
+        # konec mostu, který leží na jiné (už hotové) silniční mostovce (rozdělená estakáda, sjezd z mostu): nezačíná na terénu,
+        # ale ve výšce té mostovky; jinak by sjezd i druhý pás estakády klesaly v křižovatce k zemi
+        jn = [False, False]
+        if kind == 'road':
+            for ei, ep in enumerate((bc[0], bc[-1])):
+                pe = Point(ep)
+                for D_ in DECKS:
+                    if D_[5] != 'road' or D_[0].distance(pe) > 2.0: continue
+                    k_ = int(np.argmin(np.abs(d - (ds0 if ei == 0 else ds1))))
+                    req[k_] = max(req[k_], float(np.interp(D_[0].project(pe), D_[1], D_[2]))); jn[ei] = True; break
+        dcl = np.minimum(d if not jn[0] else np.full_like(d, 1e9), (L - d) if not jn[1] else np.full_like(d, 1e9))
         G = GRADE[kind]
         hr = req - gz                                  # požadovaná výška nad terénem; nájezd ji ubírá o G na metr (cesta dál kopíruje svah)
         hz = np.max(hr[None, :] - G * np.abs(d[:, None] - d[None, :]), axis=1)
-        hz = np.minimum(hz, 0.15 + 0.2 * np.minimum(d, L - d))   # konce vždy na terénu (krátký nájezd = strmější)
+        hz = np.minimum(hz, 0.15 + 0.2 * dcl)   # konce vždy na terénu (krátký nájezd = strmější), mimo napojení na jinou mostovku
         z = gz + np.maximum(hz, 0.15)
         si = np.where(span)[0]
         hull = []                                      # v rozpětí mostu horní konvexní obálka (bez propadů)
@@ -1408,6 +1420,22 @@ for d in DOMS:
          's': 4, 'id': bid, 'lm': sp.get('lm', 'dom'), 'dn': d['name'], 'only': 1, 'tw': []}
     # výšky terénu ve vybraných bodech pro vlastní model ("probe": {"jméno": [lat, lon]} -> b['probe'][jméno], stejné měřítko jako b.g)
     if sp.get('probe'): b['probe'] = {k: round(float(ground(*to_local(lo, la))), 2) for k, (la, lo) in sp['probe'].items()}
+    # osa vlastního modelu na mostě ("os": [[lat, lon], …]) -> b['os'] = [[dx, dy, výška mostovky - g]] po ~2,9 m (mostovka z DECKS, jinak terén)
+    if sp.get('os'):
+        oc_ = [to_local(lo, la) for la, lo in sp['os']]
+        for _ in range(2):                                      # Chaikin: osa z OSM má zlomy, skutečný tunel je plynule zakřivený
+            oc_ = [oc_[0]] + [q_ for p0, p1 in zip(oc_, oc_[1:]) for q_ in ((0.75 * p0[0] + 0.25 * p1[0], 0.75 * p0[1] + 0.25 * p1[1]), (0.25 * p0[0] + 0.75 * p1[0], 0.25 * p0[1] + 0.75 * p1[1]))] + [oc_[-1]]
+        ol = LineString(oc_); n_ = max(2, int(round(ol.length / 2.875)))
+        b['os'] = []
+        for k_ in range(n_ + 1):
+            q = ol.interpolate(ol.length * k_ / n_); zq = float(ground(q.x, q.y)); bd_ = 12.0
+            for D_ in DECKS:
+                dd = D_[0].distance(q)
+                if D_[5] == 'road' and dd < bd_: bd_ = dd; zq = float(np.interp(D_[0].project(q), D_[1], D_[2]))
+            b['os'].append([round(q.x - x, 2), round(q.y - y, 2), round(zq - g, 2)])
+        zs_ = np.array([v[2] for v in b['os']])             # přeskok mezi dvěma mostovkami z dat vyhladit (klouzavý průměr)
+        for _ in range(3): zs_ = np.convolve(np.pad(zs_, 2, mode='edge'), np.ones(5) / 5, mode='valid')
+        for v, z_ in zip(b['os'], zs_): v[2] = round(float(z_), 2)
     for tw in sp.get('towers', []):
         b['tw'].append({'x': round(x, 2), 'y': round(y, 2), 'a': 0.0, 'w': tw['w'], 'h': round(g + tw['h'], 2), 'to': round(g + tw.get('to', tw['h']), 2),
                         'top': tw['top'], 'tc': tw.get('tc', [90, 96, 104]), 'wc': [150, 146, 136], 'clock': 0, 'round': tw.get('round', 0),

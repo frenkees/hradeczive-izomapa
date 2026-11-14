@@ -661,4 +661,100 @@ export const landmarks = {
     pushBox(X, f, -0.07, 0.07, -0.55, 0.55, g + 70.0, g + 70.2, GOLDC, [0, 1, 0, 0]);
     return true;
   },
+  // Lávka u Aldisu (2023, UHPC): bílá štíhlá mostovka 102 m, hlavní pole ~66 m přes Labe bez pilíře v řece, za ním pilíř do V
+  // na východním břehu. Ocelová žebra po 2,5 m sledují spodní pás ze dvou předpjatých lan a nad mostovkou pokračují jako
+  // sloupky zábradlí (1,3 m) prohnuté ven, v madle LED. Na západním konci široké schodiště do předpolí, na východě končí
+  // v úrovni plochy u ČSOB. Pod lávkou na východním břehu náplavka: dřevěné sedací schody k vodě a malé molo (fotka 2024).
+  // Půdorys z OSM (obrys mostu, molo), výšky z DMR přes "probe", tvar z volně licencovaných fotek (landmarks_ref/lavka_aldis).
+  lavka_aldis(b, { X, frameAt, pushBox, pushQuad }) {
+    let cx = 0, cy = 0; for (const [x, y] of b.p) { cx += x / b.p.length; cy += y / b.p.length; }
+    const pr = b.probe || {}, g = b.g;
+    const Zw = (pr.zapad ?? g + 3.4) + 1.05, Ze = (pr.vychod ?? g + 5.9) + 0.06, Zc = (pr.voda ?? g) + 7.2;
+    const A0 = [-45.66, -2.7], A1 = [66.26, 10.3], L = Math.hypot(A1[0] - A0[0], A1[1] - A0[1]);
+    const ang = Math.atan2(A1[1] - A0[1], A1[0] - A0[0]), f = frameAt(cx + A0[0], cy + A0[1], 0, ang);
+    const SC = 38, SP = 70;                                                 // vrchol nivelety, pilíř do V
+    const zd = (s) => s <= SC ? Zw + (Zc - Zw) * (1 - Math.cos(Math.PI * Math.max(0, s) / SC)) / 2
+                              : Ze + (Zc - Ze) * (1 + Math.cos(Math.PI * Math.min(L, s - SC) / (L - SC))) / 2;
+    const dep = (s) => s < SP ? 0.45 + 1.75 * Math.sin(Math.PI * Math.max(0, s - 3) / (SP - 3)) : 0.4 + 0.85 * Math.sin(Math.PI * Math.min(1, (s - SP) / (L - SP - 2)));
+    const WHITE = C(246, 246, 244), DECK = C(222, 222, 218), EDGE = C(240, 240, 238), CABLE = C(86, 90, 96), CONC = C(168, 166, 160);
+    const LED = C(255, 246, 222), HW = 2.5, TH = 0.32;
+    const solid = [0, 1, 0, 0];
+    // mostovka: horní plocha s plynulou niveletou, bílé čelo, podhled
+    for (let s = 0; s < L - 0.01; s += 1.25) {
+      const s1 = Math.min(L, s + 1.25), z0 = zd(s), z1 = zd(s1);
+      pushQuad(X, f(s, -HW, z0), f(s1, -HW, z1), f(s1, HW, z1), f(s, HW, z0), DECK, [0, 1, 1, 0]);
+      pushQuad(X, f(s, -HW, z0 - TH), f(s1, -HW, z1 - TH), f(s1, -HW, z1), f(s, -HW, z0), EDGE, solid);
+      pushQuad(X, f(s1, HW, z1 - TH), f(s, HW, z0 - TH), f(s, HW, z0), f(s1, HW, z1), EDGE, solid);
+      pushQuad(X, f(s1, -HW + 0.4, z1 - TH - 0.05), f(s, -HW + 0.4, z0 - TH - 0.05), f(s, HW - 0.4, z0 - TH - 0.05), f(s1, HW - 0.4, z1 - TH - 0.05), EDGE.map((q) => q * 0.8), solid);
+    }
+    // žebra po 2,5 m: pod mostovkou prohnutý oblouk k lanu, nad ní sloupek zábradlí prohnutý ven; madlo s LED
+    const rib = (s, pts) => {                                               // lomená čára v řezu (t, z) z malých kvádrů
+      for (let k = 0; k < pts.length - 1; k++) {
+        const [ta, za] = pts[k], [tb, zb] = pts[k + 1], n = Math.max(1, Math.ceil(Math.abs(zb - za) / 0.16));
+        for (let i = 0; i < n; i++) {
+          const u0 = i / n, u1 = (i + 1) / n, tm = ta + (tb - ta) * (u0 + u1) / 2;
+          pushBox(X, f, s - 0.17, s + 0.17, tm - 0.11, tm + 0.11, Math.min(za + (zb - za) * u0, za + (zb - za) * u1), Math.max(za + (zb - za) * u0, za + (zb - za) * u1) + 0.02, WHITE, solid);
+        }
+      }
+    };
+    for (let s = 1.25; s < L - 0.5; s += 2.5) {
+      const z = zd(s), d = dep(s), tc = 1.15 + 0.35 * d / 2.2;
+      for (const sd of [-1, 1]) {
+        rib(s, [[sd * HW, z - TH], [sd * (HW + 0.45), z - TH - 0.3 * d], [sd * (HW + 0.25), z - TH - 0.7 * d], [sd * tc, z - TH - d]]);
+        rib(s, [[sd * (HW - 0.05), z], [sd * (HW + 0.05), z + 0.45], [sd * (HW + 0.22), z + 0.9], [sd * (HW + 0.35), z + 1.3]]);
+      }
+    }
+    for (let s = 0; s < L - 0.01; s += 1.25) {
+      const s1 = Math.min(L, s + 1.25), za = zd(s), zb = zd(s1), da = dep(s), db = dep(s1);
+      for (const sd of [-1, 1]) {
+        const ta = sd * (1.15 + 0.35 * da / 2.2), tb = sd * (1.15 + 0.35 * db / 2.2);
+        // spodní pás: dvě lana
+        pushQuad(X, f(s, ta - 0.07, za - TH - da), f(s1, tb - 0.07, zb - TH - db), f(s1, tb + 0.07, zb - TH - db + 0.12), f(s, ta + 0.07, za - TH - da + 0.12), CABLE, solid);
+        // madlo (svítí v noci) a mezilehlé madlo
+        const th = sd * (HW + 0.35);
+        pushBox(X, f, s, s1 + 0.02, th - 0.07, th + 0.07, (za + zb) / 2 + 1.25, (za + zb) / 2 + 1.37, WHITE, [0.75, 1, 0, 0], LED);
+        pushBox(X, f, s, s1 + 0.02, sd * (HW + 0.18) - 0.03, sd * (HW + 0.18) + 0.03, (za + zb) / 2 + 0.62, (za + zb) / 2 + 0.68, C(200, 202, 204), solid);
+      }
+    }
+    // opěra na západním břehu a pilíř do V u východní stezky
+    pushBox(X, f, 1.5, 5.0, -1.6, 1.6, (pr.zapad ?? g + 3.4) - 2.5, zd(1.5) - TH - 0.3, CONC, solid);
+    const gp = pr.pilir ?? g + 1.7, zp = zd(SP) - TH;
+    for (let k = 0; k < 14; k++) {                                          // dvě ramena V podél osy, dole spojená
+      const u0 = k / 14, u1 = (k + 1) / 14, h0 = gp + (zp - gp) * u0, h1 = gp + (zp - gp) * u1;
+      const sp0 = 0.6 + 2.6 * Math.pow(u0, 1.4), sp1 = 0.6 + 2.6 * Math.pow(u1, 1.4), sm = (sp0 + sp1) / 2;
+      if (k < 3) pushBox(X, f, SP - sm - 0.45, SP + sm + 0.45, -0.75, 0.75, h0, h1 + 0.02, CONC, solid);
+      else for (const sd of [-1, 1]) pushBox(X, f, SP + sd * sm - 0.45, SP + sd * sm + 0.45, -0.75, 0.75, h0, h1 + 0.02, CONC, solid);
+    }
+    pushBox(X, f, SP - 3.6, SP + 3.6, -1.0, 1.0, zp - 0.25, zp, CONC, solid);                   // úložný práh
+    // západní konec: plošina a schodiště do předpolí ve tvaru vějíře (7 stupňů)
+    const fz = frameAt(cx + A0[0], cy + A0[1], 0, ang), Rs = 2.6, NS = 7, rise = (Zw - (pr.zapad ?? Zw - 1.05)) / NS;
+    pushBox(X, fz, -1.0, 0.6, -HW, HW, Zw - 1.4, Zw, DECK, [0, 1, 1, 0]);
+    for (let k = 0; k < NS; k++) {
+      const r0 = Rs + k * 0.42, r1 = r0 + 0.42, zt = Zw - (k + 1) * rise;
+      for (let a = 0; a < 18; a++) {
+        const a0 = Math.PI / 2 + Math.PI * a / 18, a1 = Math.PI / 2 + Math.PI * (a + 1) / 18, am = (a0 + a1) / 2;
+        const ff = frameAt(cx + A0[0] + Math.cos(ang + am) * (r0 + r1) / 2 - Math.cos(ang) * 1.0, cy + A0[1] + Math.sin(ang + am) * (r0 + r1) / 2 - Math.sin(ang) * 1.0, 0, ang + am);
+        const hw = Math.tan((a1 - a0) / 2) * r1 + 0.03;
+        pushBox(X, ff, -0.21, 0.21, -hw, hw, zt - 1.2, zt, k % 2 ? C(190, 188, 182) : C(200, 198, 192), [0, 1, 1, 0]);
+      }
+    }
+    // náplavka na východním břehu: dřevěné sedací schody podél stezky k hladině, betonové čelní zídky
+    const WOOD = C(204, 168, 112), WOOD_D = C(150, 118, 76);
+    const B0 = [23.3, 6.0], B1 = [20.2, 40.0], bl = Math.hypot(B1[0] - B0[0], B1[1] - B0[1]), ba = Math.atan2(B1[1] - B0[1], B1[0] - B0[0]);
+    const fb = frameAt(cx + B0[0], cy + B0[1], 0, ba);                       // s podél břehu k severu, t > 0 = k řece (na západ)
+    const zt0 = (pr.naplavka ?? g + 1.7) - 0.05, zw = (pr.voda ?? g) + 0.15, NB = 9, run = 0.78, rb = (zt0 - zw) / NB;
+    for (let k = 0; k < NB; k++) {
+      const t0 = 1.6 + k * run, z = zt0 - (k + 1) * rb;
+      pushBox(X, fb, 0, bl, t0, t0 + run, zw - 1.0, z, WOOD_D, [0, 1, 0, 0], WOOD);
+    }
+    for (const s of [-0.5, bl]) pushBox(X, fb, s, s + 0.5, 1.4, 1.6 + NB * run, zw - 1.0, zt0 + 0.1, C(186, 184, 178), solid);
+    // molo: dřevěný plovoucí pontón u severního konce schodů se zábradlím k řece
+    const fm = frameAt(cx + 11.8, cy + 47.9, 0, ba), zm = Math.max(zw + 0.45, (pr.molo ?? zw) + 0.4);
+    pushBox(X, fm, -3.6, 3.6, -1.7, 1.7, zm - 0.3, zm, WOOD_D, [0, 1, 0, 0], WOOD);
+    pushBox(X, fm, -3.4, 3.4, -1.5, 1.5, zm - 0.75, zm - 0.3, C(60, 62, 66), solid);                   // plováky
+    for (let s = -3.4; s <= 3.41; s += 1.7) pushBox(X, fm, s - 0.05, s + 0.05, 1.56, 1.66, zm, zm + 1.0, C(70, 74, 80), solid);
+    pushBox(X, fm, -3.45, 3.45, 1.54, 1.68, zm + 0.93, zm + 1.02, C(70, 74, 80), solid);
+    pushBox(X, fm, -3.6, -2.4, -1.7 - 2.2, -1.7, zm - 0.05, zm + 0.02, WOOD, [0, 1, 0, 0]);              // lávka na břeh
+    return true;
+  },
 };

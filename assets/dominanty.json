@@ -637,5 +637,73 @@
    "h": 2,
    "w": 14
   }
+ },
+ {
+  "name": "Lávka u Aldisu",
+  "lat": 50.216,
+  "lon": 15.8275,
+  "text": "Lávka pro pěší a cyklisty přes Labe (otevřena 2023) spojuje Smetanovo nábřeží s Eliščiným nábřežím u Aldisu. Mostovka z vysokopevnostního betonu UHPC je nesená dvojicí předpjatých lan ve spodním pásu, ocelová žebra po 2,5 m nad mostovkou pokračují jako sloupky zábradlí s LED osvětlením v madle; hlavní pole měří asi 66 m a řeky se nedotýká. Pod lávkou na východním břehu je náplavka s dřevěnými sedacími schody k vodě. Model podle volně licencovaných fotek z Wikimedia Commons, OSM a ortofota ČÚZK.",
+  "spec": {
+   "only": 1,
+   "lm": "lavka_aldis",
+   "w": 6,
+   "h": 8,
+   "top": 9,
+   "cls": "most",
+   "probe": {
+    "zapad": [
+     50.2159729,
+     15.8267981
+    ],
+    "vychod": [
+     50.2160932,
+     15.8284307
+    ],
+    "voda": [
+     50.2160145,
+     15.8274298
+    ],
+    "naplavka": [
+     50.216199,
+     15.8278299
+    ],
+    "pilir": [
+     50.2160487,
+     15.8278351
+    ],
+    "molo": [
+     50.2164333,
+     15.8276685
+    ]
+   },
+   "bez_stromu": [
+    {
+     "q": [
+      [
+       50.2159756,
+       15.826859
+      ],
+      [
+       50.2160932,
+       15.8284302
+      ]
+     ],
+     "w": 7
+    },
+    {
+     "q": [
+      [
+       50.2160543,
+       15.8278088
+      ],
+      [
+       50.21638,
+       15.8277106
+      ]
+     ],
+     "w": 10
+    }
+   ]
+  }
  }
 ]

@@ -358,6 +358,39 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
                         _zb.append(LineString([(cx_ - ux * 1.6, cy_ - uy * 1.6), (cx_ + ux * 1.6, cy_ + uy * 1.6)]).buffer(0.25, cap_style='flat'))
             if _zb: _zpaint(shapely.unary_union(_zb), 'marking')
             print('MMHK: přestavby', [p['nazev'] for p in _PRE], 'cest z OSM', len(_PRE_W), 'přechodů', len(_zb) // 6)
+        # 5a2) chodník a cyklostezka silničního mostu jsou součást mostní konstrukce: v pasportu je to plocha nad vodou těsně
+        #      vedle mostovky (v OSM bývá chodník zvlášť a mostovka z dat má jen šířku vozovky). Mostovka se o ni rozšíří
+        #      a osa se posune k chodníku, ať pás chodníku nezůstane namalovaný na hladině.
+        _wsh = _MM_W.buffer(-0.5)
+        _foot_rd = [D[0].buffer(D[4] / 2, cap_style='flat') for D in DECKS if D[5] == 'road']
+        _Usw = U.intersection(_wsh).difference(shapely.unary_union(_foot_rd)) if _foot_rd and not U.is_empty else Polygon()
+        _Uswp = shapely.prepared.prep(_Usw)
+        _nwid = 0
+        for _di, D in enumerate(DECKS):
+            if D[5] != 'road' or _Usw.is_empty or not (len(D) > 8 and D[8]): continue
+            _xy = np.array(D[0].coords)[:, :2]; _z = np.asarray(D[2]); _g = np.asarray(D[3])
+            if len(_xy) != len(_z) or len(_xy) < 3: continue
+            _nrm = np.zeros_like(_xy)
+            for k in range(len(_xy)):
+                t_ = _xy[min(k + 1, len(_xy) - 1)] - _xy[max(k - 1, 0)]; t_ = t_ / (np.hypot(*t_) or 1)
+                _nrm[k] = (-t_[1], t_[0])                         # levá normála
+            _ext = {1: [], -1: []}
+            for k in range(1, len(_xy) - 1):
+                if _z[k] - _g[k] < 1.0 or not _MM_WP.contains(Point(*_xy[k])): continue
+                for sd in (1, -1):
+                    last, o = None, D[4] / 2
+                    while o < D[4] / 2 + 8.0:
+                        if _Uswp.contains(Point(*(_xy[k] + _nrm[k] * sd * o))): last = o
+                        elif (last is None and o > D[4] / 2 + 1.0) or (last is not None and o - last > 0.75): break
+                        o += 0.25
+                    _ext[sd].append(0.0 if last is None else last - D[4] / 2 + 0.25)
+            if len(_ext[1]) < 2: continue
+            eL, eR = float(np.median(_ext[1])), float(np.median(_ext[-1]))
+            eL, eR = (eL if eL > 0.8 else 0.0), (eR if eR > 0.8 else 0.0)
+            if not (eL or eR): continue
+            _sh = (eL - eR) / 2
+            DECKS[_di] = (LineString(_xy + _nrm * _sh), D[1], D[2], D[3], round(D[4] + eL + eR, 2), *D[5:]); _nwid += 1
+        if _nwid: print('MMHK: silničních mostů rozšířených o chodník z pasportu', _nwid)
         # 5b) pod mostovkou (výš než 1 m nad terénem) povrch z doby před pasportem: plocha vozovky a chodníku na mostě
         #     se jinak namaluje i na zem, vodu nebo koleje pod ním (silnice z OSM se pod mosty nekreslí už v prep.py)
         _under_d = []
@@ -375,6 +408,12 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             _um = _mask(shapely.unary_union(_under_d).intersection(_MM_PIL))
             S[_um] = ORIG[_um]
             print('MMHK: pod mostovkami vrácen původní povrch px', int(_um.sum()))
+        # 5c) cesty a plochy na hladině: most je 3D mostovka nebo vlastní model (jez Hučák, lávka u Aldisu), takže vozovka,
+        #     chodník nebo dlažba namalovaná do vody je vždy plocha mostu na hladině -> voda (1,5 m od břehu nech, břeh v datech nesedí přesně)
+        _wm = _mask(_MM_W.buffer(-1.5).intersection(_MM_PIL)) & np.isin(S, ROADISH)
+        if _wm.any():
+            S[_wm] = C['water']
+            print('MMHK: cesty na hladině vráceny na vodu px', int(_wm.sum()))
         cls.paste(Image.fromarray(_A))
         # 6) lampy veřejného osvětlení místo odhadnutých po 34 m
         _n0 = len(props['lamp'])
@@ -424,3 +463,16 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
                 lines_out['fence'].append([[round(float(x), 2), round(float(y), 2), round(float(zz), 2)] for (x, y), zz in zip(P_, z_)]); _nz += 1
         print('MMHK: povrchů', len(_MM_POV), 'zeleně', len(_MM_ZEL), 'značení px', int((S == C['marking']).sum()),
               'lamp', _nl, 'místo', _nr, '| aut na stáních', _nca, 'odebráno', _ncr, '| zábradlí', _nz)
+
+# ---- vlastní modely mostů a lávek: stromy v jejich pásu pryč (koruna by prorůstala mostovkou) ----
+# dominanty.json "spec": {"bez_stromu": [{"q": [[lat, lon], ...], "w": šířka pásu v m}]}; strom se skryje (kind 2, pořadí barev zůstane),
+# když je kmen blíž než půl šířky + poloměr koruny (listnatý ~0,33 h)
+if HOOK == 'cemetery':
+    _bz = [(LineString([to_local(lo, la) for la, lo in q['q']]), q.get('w', 6.0)) for d in DOMS for q in d['spec'].get('bez_stromu', [])]
+    if _bz:
+        _nb = 0
+        for t in trees:
+            if t[5] == 2: continue
+            P_ = Point(t[0], t[1])
+            if any(l.distance(P_) < w / 2 + t[3] * (0.2 if t[4] else 0.33) for l, w in _bz): t[5] = 2; _nb += 1
+        print('stromů v pásu vlastních mostů skryto', _nb)

@@ -769,5 +769,676 @@
     ]
    ]
   }
+ },
+ {
+  "name": "Kostel Nanebevzetí Panny Marie",
+  "lat": 50.20905,
+  "lon": 15.83416,
+  "text": "Barokní jezuitský kostel u Velkého náměstí: žlutobílé průčelí se dvěma věžemi, které nesou zelené měděné báně s lucernami a zlatými makovicemi. Model podle volně licencovaných fotek z Wikimedia Commons a ortofota ČÚZK (landmarks_ref v katalogu noc).",
+  "spec": {
+   "wc": [
+    226,
+    200,
+    124
+   ],
+   "rc": [
+    178,
+    92,
+    62
+   ],
+   "r": "gabled",
+   "h": 15,
+   "rh": 10,
+   "win": 4,
+   "towers": [
+    {
+     "at": "front",
+     "side": -4.5,
+     "w": 5.5,
+     "h": 24,
+     "top": "helm",
+     "to": 40,
+     "tc": [
+      86,
+      150,
+      128
+     ],
+     "wc": [
+      226,
+      200,
+      124
+     ]
+    },
+    {
+     "at": "front",
+     "side": 4.5,
+     "w": 5.5,
+     "h": 25,
+     "top": "helm",
+     "to": 42,
+     "tc": [
+      86,
+      150,
+      128
+     ],
+     "wc": [
+      226,
+      200,
+      124
+     ]
+    }
+   ],
+   "face": [
+    50.20935,
+    15.83405
+   ]
+  }
+ },
+ {
+  "name": "Radnice",
+  "lat": 50.20932,
+  "lon": 15.83136,
+  "text": "Radnice na Velkém náměstí vedle Bílé věže: bílé klasicistní průčelí, červená střecha a malá věžička s hodinami. Model podle fotek z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    238,
+    234,
+    226
+   ],
+   "rc": [
+    192,
+    94,
+    62
+   ],
+   "r": "hipped",
+   "h": 12,
+   "rh": 5,
+   "win": 3,
+   "towers": [
+    {
+     "at": "front",
+     "side": 6,
+     "w": 4,
+     "h": 16,
+     "top": "helm",
+     "to": 24,
+     "tc": [
+      40,
+      40,
+      44
+     ],
+     "wc": [
+      238,
+      234,
+      226
+     ],
+     "clock": true
+    }
+   ],
+   "face": [
+    50.20932,
+    15.833
+   ]
+  }
+ },
+ {
+  "name": "Klicperovo divadlo",
+  "lat": 50.21088,
+  "lon": 15.83385,
+  "text": "Klicperovo divadlo: žlutá fasáda s bílými pilastry, balkon nad sloupovým vstupem, tašková střecha. Model podle fotek z Wikimedia Commons a ortofota ČÚZK.",
+  "spec": {
+   "wc": [
+    236,
+    208,
+    120
+   ],
+   "rc": [
+    172,
+    96,
+    64
+   ],
+   "r": "hipped",
+   "h": 11,
+   "rh": 4,
+   "win": 3,
+   "face": [
+    50.21055,
+    15.83385
+   ]
+  }
+ },
+ {
+  "name": "Galerie moderního umění",
+  "lat": 50.20993,
+  "lon": 15.83422,
+  "text": "Galerie moderního umění (Gočárova stavba): šedá kamenná fasáda s vertikálním členěním a nárožím do náměstí. Model podle fotek z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    170,
+    168,
+    164
+   ],
+   "rc": [
+    84,
+    86,
+    90
+   ],
+   "r": "flat",
+   "h": 21,
+   "win": 3
+  }
+ },
+ {
+  "name": "Evangelický kostel",
+  "lat": 50.20987,
+  "lon": 15.8387,
+  "text": "Evangelický kostel: stavba s šedou omítkou, oranžovou valbovou střechou a věžičkou se zelenou střechou. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    186,
+    180,
+    170
+   ],
+   "rc": [
+    196,
+    96,
+    60
+   ],
+   "r": "hipped",
+   "h": 8,
+   "rh": 5,
+   "win": 3,
+   "towers": [
+    {
+     "at": "front",
+     "side": -5,
+     "w": 4,
+     "h": 14,
+     "top": "pyramid",
+     "to": 20,
+     "tc": [
+      96,
+      150,
+      140
+     ],
+     "wc": [
+      186,
+      180,
+      170
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "Sbor kněze Ambrože",
+  "lat": 50.20917,
+  "lon": 15.82278,
+  "text": "Husitský sbor kněze Ambrože: bílá betonová stavba s velmi vysokou štíhlou věží. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    222,
+    220,
+    214
+   ],
+   "rc": [
+    150,
+    150,
+    150
+   ],
+   "r": "flat",
+   "h": 8,
+   "win": 2,
+   "towers": [
+    {
+     "at": "front",
+     "side": 0,
+     "w": 3.5,
+     "h": 32,
+     "top": "none",
+     "wc": [
+      226,
+      224,
+      218
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "Kostel Božského srdce Páně",
+  "lat": 50.2131,
+  "lon": 15.8151,
+  "text": "Kostel Božského srdce Páně: hranatý betonový kostel s vysokou věží zakončenou křížem. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    160,
+    158,
+    152
+   ],
+   "rc": [
+    130,
+    130,
+    128
+   ],
+   "r": "flat",
+   "h": 11,
+   "win": 2,
+   "towers": [
+    {
+     "at": "front",
+     "side": 0,
+     "w": 5,
+     "h": 28,
+     "top": "none",
+     "wc": [
+      160,
+      158,
+      152
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "Kostel svatého Antonína Poustevníka",
+  "lat": 50.1769,
+  "lon": 15.8553,
+  "text": "Barokní kostel se žlutou omítkou, červenou sedlovou střechou a věží s tmavou báni. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    232,
+    204,
+    110
+   ],
+   "rc": [
+    190,
+    86,
+    56
+   ],
+   "r": "gabled",
+   "h": 9,
+   "rh": 7,
+   "win": 4,
+   "towers": [
+    {
+     "at": "front",
+     "side": 0,
+     "w": 4.5,
+     "h": 14,
+     "top": "helm",
+     "to": 24,
+     "tc": [
+      60,
+      66,
+      66
+     ],
+     "wc": [
+      232,
+      204,
+      110
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "Adalbertinum",
+  "lat": 50.21121,
+  "lon": 15.83115,
+  "text": "Adalbertinum: žlutá neobarokní budova s bohatou fasádou a zelenými báněmi nad nárožními rizality. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    232,
+    210,
+    140
+   ],
+   "rc": [
+    120,
+    124,
+    128
+   ],
+   "r": "hipped",
+   "h": 17,
+   "rh": 5,
+   "win": 4,
+   "towers": [
+    {
+     "at": "front",
+     "side": -9,
+     "w": 4.5,
+     "h": 18,
+     "top": "dome",
+     "to": 25,
+     "tc": [
+      96,
+      160,
+      140
+     ],
+     "wc": [
+      232,
+      210,
+      140
+     ]
+    },
+    {
+     "at": "front",
+     "side": 9,
+     "w": 4.5,
+     "h": 18,
+     "top": "dome",
+     "to": 25,
+     "tc": [
+      96,
+      160,
+      140
+     ],
+     "wc": [
+      232,
+      210,
+      140
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "Kongresové centrum Aldis",
+  "lat": 50.21547,
+  "lon": 15.82906,
+  "text": "Kongresové centrum Aldis: dlouhá světlá budova s horizontálním členěním fasády a prosklenou vstupní částí. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    232,
+    228,
+    216
+   ],
+   "rc": [
+    140,
+    140,
+    140
+   ],
+   "r": "flat",
+   "h": 14,
+   "win": 3
+  }
+ },
+ {
+  "name": "Hvězdárna a planetárium",
+  "lat": 50.17722,
+  "lon": 15.83917,
+  "text": "Hvězdárna a planetárium: nízká bílá budova s kupolí observatoře. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    226,
+    224,
+    220
+   ],
+   "rc": [
+    150,
+    150,
+    150
+   ],
+   "r": "flat",
+   "h": 7,
+   "win": 2,
+   "towers": [
+    {
+     "at": "e",
+     "side": 0,
+     "w": 6,
+     "h": 10,
+     "top": "dome",
+     "to": 14,
+     "tc": [
+      196,
+      196,
+      198
+     ],
+     "wc": [
+      226,
+      224,
+      220
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "Pedagogická fakulta",
+  "lat": 50.20944,
+  "lon": 15.82667,
+  "text": "Pedagogická fakulta Univerzity Hradec Králové: nárožní budova s okrovou fasádou, bohatým členěním oken a tmavou valbovou střechou. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    214,
+    184,
+    110
+   ],
+   "rc": [
+    96,
+    96,
+    100
+   ],
+   "r": "hipped",
+   "h": 17,
+   "rh": 4,
+   "win": 4
+  }
+ },
+ {
+  "name": "Rudolfinum",
+  "lat": 50.21319,
+  "lon": 15.84083,
+  "text": "Rudolfinum: světlá historizující budova s hlavním rizalitem a červenou střechou. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    232,
+    226,
+    214
+   ],
+   "rc": [
+    176,
+    84,
+    64
+   ],
+   "r": "hipped",
+   "h": 14,
+   "rh": 5,
+   "win": 4
+  }
+ },
+ {
+  "name": "Hotely Grand a Labská",
+  "lat": 50.2104,
+  "lon": 15.82961,
+  "text": "Hotely Grand a Labská: secesní budova s krémovou fasádou, štíty a velkým obloukovým oknem v nároží. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    232,
+    214,
+    170
+   ],
+   "rc": [
+    170,
+    92,
+    70
+   ],
+   "r": "gabled",
+   "h": 18,
+   "rh": 5,
+   "win": 4
+  }
+ },
+ {
+  "name": "Kněžský seminář",
+  "lat": 50.21081,
+  "lon": 15.83234,
+  "text": "Kněžský seminář: žlutá barokní budova se zelenou měděnou střechou. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    222,
+    204,
+    140
+   ],
+   "rc": [
+    96,
+    140,
+    120
+   ],
+   "r": "hipped",
+   "h": 10,
+   "rh": 7,
+   "win": 4
+  }
+ },
+ {
+  "name": "Pivovar Hradec Králové",
+  "lat": 50.20831,
+  "lon": 15.82955,
+  "text": "Budova pivovaru: žlutá fasáda s řadami oken a dva vysoké komíny. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    230,
+    200,
+    110
+   ],
+   "rc": [
+    110,
+    100,
+    98
+   ],
+   "r": "hipped",
+   "h": 22,
+   "rh": 4,
+   "win": 4
+  }
+ },
+ {
+  "name": "Lékařská fakulta UK",
+  "lat": 50.21361,
+  "lon": 15.835,
+  "text": "Lékařská fakulta Univerzity Karlovy: dlouhá světlá pětipodlažní budova s plochou střechou. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    236,
+    232,
+    214
+   ],
+   "rc": [
+    140,
+    140,
+    140
+   ],
+   "r": "flat",
+   "h": 22,
+   "win": 3
+  }
+ },
+ {
+  "name": "Farmaceutická fakulta UK",
+  "lat": 50.20139,
+  "lon": 15.83583,
+  "text": "Farmaceutická fakulta Univerzity Karlovy: nízká bílá moderní budova s pásovými okny a červeným nápisem. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    238,
+    238,
+    234
+   ],
+   "rc": [
+    150,
+    150,
+    150
+   ],
+   "r": "flat",
+   "h": 10,
+   "win": 3
+  }
+ },
+ {
+  "name": "Gymnázium Boženy Němcové",
+  "lat": 50.2125,
+  "lon": 15.8397,
+  "text": "Gymnázium Boženy Němcové: historizující budova s okrovou fasádou a dvěma bohatě zdobenými rizality. Model podle staré fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    222,
+    196,
+    150
+   ],
+   "rc": [
+    110,
+    100,
+    96
+   ],
+   "r": "hipped",
+   "h": 17,
+   "rh": 5,
+   "win": 4
+  }
+ },
+ {
+  "name": "Wiplerova vila",
+  "lat": 50.20769,
+  "lon": 15.84043,
+  "text": "Wiplerova vila: dům zarostlý břečťanem s vysokou věžovou částí a strmou červenou střechou. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    96,
+    120,
+    80
+   ],
+   "rc": [
+    150,
+    70,
+    54
+   ],
+   "r": "gabled",
+   "h": 9,
+   "rh": 8,
+   "win": 4,
+   "towers": [
+    {
+     "at": "front",
+     "side": -3,
+     "w": 4,
+     "h": 14,
+     "top": "pyramid",
+     "to": 22,
+     "tc": [
+      150,
+      70,
+      54
+     ],
+     "wc": [
+      96,
+      120,
+      80
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "Vila Tesařových",
+  "lat": 50.20787,
+  "lon": 15.81774,
+  "text": "Vila Tesařových: bílá funkcionalistická vila krychlového tvaru s pásovými okny a sloupovým vstupem. Model podle fotky z Wikimedia Commons.",
+  "spec": {
+   "wc": [
+    240,
+    238,
+    232
+   ],
+   "rc": [
+    120,
+    120,
+    120
+   ],
+   "r": "flat",
+   "h": 9,
+   "win": 3
+  }
  }
 ]

@@ -313,6 +313,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       <label><input type="checkbox" id="l-traffic" checked> Doprava</label>
       <label><input type="checkbox" id="l-smoke" checked> Kouř z&nbsp;komínů</label>
       <label><input type="checkbox" id="l-hover" checked> Zvýraznit budovy</label>
+      <label id="l-stops-row" hidden><input type="checkbox" id="l-stops"> Zastávky MHD</label>
     </div>
   </div>
 
@@ -895,7 +896,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (pl) { showCard({ title: pl.name, text: pl.text, lon: pl.lon, lat: pl.lat, k: pl.k, rows: [] }); return; }
     showCard({ title: 'Vybrané místo', rows: [], lon, lat });
   }
-  const closeCard = () => { $('card').hidden = true; state.sel = null; };
+  const closeCard = () => { $('card').hidden = true; state.sel = null; state.selStop = null; };
   $('cardClose').addEventListener('click', closeCard);
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('card').hidden && !document.querySelector('dialog[open]') && !e.target.matches('input, textarea')) closeCard(); });
   // mobil: kartu jde stáhnout prstem dolů
@@ -1487,6 +1488,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   function stopsReady() {
     if (!MHD.stops) return;
     MHD.stopPts = MHD.stops.map(([n, x, y, kd]) => { const [ix, iy] = toImg(x, y, gz(x, y)); return { n, x, y, kd, ix, iy }; });
+    $('l-stops-row').hidden = false;
     const seen = new Set();
     for (const s of MHD.stopPts) {
       if (seen.has(s.n)) continue; seen.add(s.n);
@@ -1508,6 +1510,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     return out.sort((a, b) => a[0] - b[0]);
   }
   function showStop(s) {
+    state.selStop = s;                                          // zvýrazní se na mapě (kroužek)
     const hm = (dt) => { const p = pragueNow(), v = Math.round((p.s + dt) / 60) % 1440; return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`; };
     const za = (dt) => (dt < 60 ? 'teď' : `za ${Math.round(dt / 60)} min`);
     const groups = new Map();
@@ -2578,6 +2581,26 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath();
       b.hull.forEach(([x, y], i) => (i ? ctx.lineTo(ox + x * sx, oy + y * sx) : ctx.moveTo(ox + x * sx, oy + y * sx)));
       ctx.closePath(); ctx.stroke();
+    }
+    // zastávky MHD: značky (volba Zastávky MHD), jména při přiblížení; vybraná zastávka má pulzující kroužek vždy
+    if (MHD.stopPts && sx > 0.12) {
+      const all = $('l-stops').checked, sel = state.selStop;
+      if (all || sel) {
+        const r0 = Math.max(3.5, Math.min(9, 5.5 * sx + 2));
+        ctx.lineWidth = Math.max(1, r0 / 4); ctx.textAlign = 'center'; ctx.font = `600 ${Math.round(Math.max(10, Math.min(14, 9 * sx + 6)))}px system-ui, sans-serif`;
+        const nm = new Set();
+        for (const z of MHD.stopPts) {
+          const isSel = sel && z.n === sel.n;
+          if (!(all || isSel) || !vis(z.ix, z.iy, 20)) continue;
+          const x = ox + z.ix * sx, y = oy + z.iy * sx;
+          ctx.fillStyle = z.kd === 0 ? '#d94a38' : '#2a6fb5'; ctx.strokeStyle = '#fff';
+          ctx.beginPath(); ctx.arc(x, y - r0, r0, 0, 6.2832); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x, y - r0 * 0.1); ctx.lineTo(x, y); ctx.stroke();
+          if (isSel) { const k = (t * 1.4) % 1; ctx.strokeStyle = `rgba(242,198,109,${(1 - k).toFixed(2)})`; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y - r0, r0 + 4 + k * 14, 0, 6.2832); ctx.stroke(); ctx.lineWidth = Math.max(1, r0 / 4); }
+          if (sx > 0.45 && !nm.has(z.n)) { nm.add(z.n); const txt = MHD.names[z.n]; ctx.strokeStyle = 'rgba(20,24,32,.85)'; ctx.lineWidth = 3; ctx.strokeText(txt, x, y - r0 * 2 - 5); ctx.fillStyle = '#fff'; ctx.fillText(txt, x, y - r0 * 2 - 5); ctx.lineWidth = Math.max(1, r0 / 4); }
+        }
+        ctx.textAlign = 'start';
+      }
     }
     // doprava
     if ($('l-traffic').checked) {

@@ -52,7 +52,9 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
         _PRE_ZP = shapely.prepared.prep(_PRE_Z)
 
         def _mm_cut(g):
-            if g is None or _PRE_Z.is_empty or not g.intersects(_PRE_Z): return g
+            if g is not None and not TUNNEL_ZONES.is_empty and g.intersects(TUNNEL_ZONES): g = g.difference(TUNNEL_ZONES)   # nad tunelem (podjezd pod tratí) žádná vozovka z pasportu
+            if g is None or g.is_empty: return None
+            if _PRE_Z.is_empty or not g.intersects(_PRE_Z): return g
             g = g.difference(_PRE_Z)
             return None if g.is_empty or g.area < 0.3 else g
 

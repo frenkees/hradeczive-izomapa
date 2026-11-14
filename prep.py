@@ -173,6 +173,48 @@ RE = HALF + MS * STEP
 gx, gy = np.meshgrid(np.linspace(-RE, RE, NE), np.linspace(RE, -RE, NE))
 HX = dem(gx, gy)
 from numpy.lib.stride_tricks import sliding_window_view
+_TUN_CAR = {'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'unclassified', 'living_street', 'service'}
+def _tunnel_zones():
+    """pásy nad dlouhými tunely silnic a cest (podjezd pod tratí, tunel pod kopcem): data magistrátu tam nesmí malovat vozovku ani chodník
+    přes terén nad tunelem (kraje 3 m u portálů zůstanou). Pro hook assets/custom_prep.py; stejné prahy jako tunnel_parts (TUNNEL_MIN)."""
+    out = []
+    for _, r in load('segment').iterrows():
+        if r.subtype != 'road': continue
+        fl = r.road_flags; fl = list(fl) if isinstance(fl, (list, np.ndarray)) else []
+        w = 7.0 if r['class'] in _TUN_CAR else 3.5
+        for f in fl:
+            if 'is_tunnel' not in list(f.get('values')): continue
+            t = f.get('between'); t0, t1 = (0.0, 1.0) if t is None else (float(t[0]), float(t[1]))
+            if (t1 - t0) * r.geom.length < 60.0: continue
+            sub = shapely.ops.substring(r.geom, t0, t1, normalized=True)
+            if sub.length > 8: out.append(shapely.ops.substring(sub, 3.0, sub.length - 3.0).buffer(w / 2, cap_style='flat'))
+    return shapely.unary_union(out) if out else Polygon()
+TUNNEL_ZONES = _tunnel_zones()
+
+
+def _tunnel_passes():
+    """podjezdy silnic pod tratí (kratší „tunel“, který se kreslí jako cesta): [(osa podjezdu, půlšířka)].
+    Laser vidí nad podjezdem násyp tratě, takže se v terénu vyřízne zářez a trať se postaví jako most (syntetický is_bridge)."""
+    t = load('segment')
+    def _fl(r):
+        v = r.rail_flags if r.subtype == 'rail' else r.road_flags
+        return list(v) if isinstance(v, (list, np.ndarray)) else []
+    rails = [r.geom for _, r in t.iterrows() if r.subtype == 'rail' and r['class'] == 'standard_gauge'
+             and not any('is_tunnel' in list(f.get('values')) for f in _fl(r))]
+    rt = shapely.STRtree(rails) if rails else None
+    out = []
+    for _, r in t.iterrows():
+        if r.subtype != 'road' or r['class'] not in _TUN_CAR: continue
+        for f in _fl(r):
+            if 'is_tunnel' not in list(f.get('values')): continue
+            b = f.get('between'); t0, t1 = (0.0, 1.0) if b is None else (float(b[0]), float(b[1]))
+            L = (t1 - t0) * r.geom.length
+            if not 12.0 <= L < 60.0 or rt is None: continue
+            sub = shapely.ops.substring(r.geom, t0, t1, normalized=True)
+            mid = shapely.ops.substring(sub, 3.0, sub.length - 3.0) if sub.length > 8 else sub
+            if any(rails[k].intersects(mid) for k in rt.query(mid.buffer(1.0))): out.append((sub, 4.5 if r['class'] != 'service' else 3.5))
+    return out
+TUNNEL_PASSES = _tunnel_passes()
 _hook('terrain')
 HX = sliding_window_view(np.pad(HX, 1, mode='edge'), (3, 3)).mean(axis=(2, 3))
 HMIN = HREF; HX = HX - HMIN              # společná výška pro všechny čtverce
@@ -186,6 +228,26 @@ def ground(x, y):
     tx = np.clip(fx - x0, 0, 1); ty = np.clip(fy - y0, 0, 1)
     return (HX[y0, x0] * (1 - tx) * (1 - ty) + HX[y0, x0 + 1] * tx * (1 - ty)
             + HX[y0 + 1, x0] * (1 - tx) * ty + HX[y0 + 1, x0 + 1] * tx * ty)
+
+
+# zářez pod tratí: laser nad podjezdem vidí násyp, silnice by se přes něj přehnula. Terén podél osy podjezdu klesne na přímku mezi výškami
+# 10 m před začátkem a za koncem (jen dolů); do půlšířky plně, pak 5 m plynule do původního terénu.
+_gpt = None
+for _l, _hw in TUNNEL_PASSES:
+    if _gpt is None: _gpt = shapely.points(gx.ravel(), gy.ravel()).reshape(gx.shape)
+    _u0 = np.array(_l.coords[1]) - np.array(_l.coords[0]); _u0 /= (np.linalg.norm(_u0) or 1)
+    _u1 = np.array(_l.coords[-1]) - np.array(_l.coords[-2]); _u1 /= (np.linalg.norm(_u1) or 1)
+    _z0 = float(ground(_l.coords[0][0] - 10 * _u0[0], _l.coords[0][1] - 10 * _u0[1])); _z1 = float(ground(_l.coords[-1][0] + 10 * _u1[0], _l.coords[-1][1] + 10 * _u1[1]))
+    _bb = _l.buffer(_hw + 5.0).bounds
+    _m = (gx >= _bb[0]) & (gx <= _bb[2]) & (gy >= _bb[1]) & (gy <= _bb[3])
+    if not _m.any(): continue
+    _pp = _gpt[_m]
+    _d = shapely.distance(_pp, _l); _t = np.clip(shapely.line_locate_point(_l, _pp) / _l.length, 0, 1)
+    _zt = _z0 + (_z1 - _z0) * _t
+    _w = np.clip((_hw + 5.0 - _d) / 5.0, 0, 1)
+    _cur = HX[_m]
+    HX[_m] = np.where(_cur > _zt + 0.5, _cur * (1 - _w) + _zt * _w, _cur)
+    print('zářez podjezdu', round(_l.length), 'm, násyp max', round(float((_cur - _zt).max()), 1), 'm')
 
 
 # ---------------- hradby a opěrné zdi jako svislé stěny (útesy ve stylu SimCity 2000) ----------------
@@ -438,13 +500,25 @@ for _, r in seg.iterrows():
     if tp is None: _rows.append(r); continue
     for i, (a, b_) in enumerate(tp):
         q = r.copy(); q['geom'] = shapely.ops.substring(r.geom, a, b_, normalized=True); _rows.append(q)
-    if r['class'] == 'trunk':                           # portály na koncích tunelu
+    if r['class'] in _TUN_CAR:                          # portály na koncích tunelu (hw = poloviční světlá šířka)
+        _hw = 6.6 if r['class'] in ('trunk', 'motorway') else 4.4 if r['class'] != 'service' else 3.2
         for a, b_ in tp:
             for t, sg in ((a, 1), (b_, -1)):
                 if 0 < t < 1:
                     p0 = r.geom.interpolate(t, normalized=True); p1 = r.geom.interpolate(max(0, min(1, t + sg * 0.004)), normalized=True)
-                    portals.append((p0.x, p0.y, math.atan2(p1.y - p0.y, p1.x - p0.x)))
+                    portals.append((p0.x, p0.y, math.atan2(p1.y - p0.y, p1.x - p0.x), _hw))
 seg = pd.DataFrame(_rows).reset_index(drop=True)
+# trať nad podjezdem silnice: Overture ji nemá jako most, proto se přidá úsek is_bridge přes pás podjezdu (postaví se mostovka)
+if TUNNEL_PASSES:
+    _zb = shapely.unary_union([l.buffer(hw + 2.0, cap_style='flat') for l, hw in TUNNEL_PASSES])
+    for _i, _r in seg.iterrows():
+        if _r.subtype != 'rail' or not _r.geom.intersects(_zb): continue
+        _fl = _r.rail_flags; _fl = list(_fl) if isinstance(_fl, (list, np.ndarray)) else []
+        for _g in lines(_r.geom.intersection(_zb)):
+            if _g.length < 4: continue
+            _t0 = _r.geom.project(Point(_g.coords[0])) / _r.geom.length; _t1 = _r.geom.project(Point(_g.coords[-1])) / _r.geom.length
+            _fl.append({'values': np.array(['is_bridge']), 'between': np.array([min(_t0, _t1), max(_t0, _t1)])})
+        seg.at[_i, 'rail_flags'] = _fl
 # mosty a lávky: úsek označený is_bridge se nekreslí do terénu, ale postaví se jako mostovka (scene.bridges)
 BRIDGE_MIN = UP.get('bridge_min', 8.0)      # kratší „most“ (propustek nad potokem) zůstane obyčejnou cestou
 def bridge_parts(r):
@@ -1682,7 +1756,7 @@ buses = []
 for a, e, k in UP['buses']:
     x1, y1 = to_local(a[1], a[0]); x2, y2 = to_local(e[1], e[0]); x, y = (x1 + x2) / 2, (y1 + y2) / 2
     if AREA.contains(Point(x, y)): buses.append([round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(math.atan2(y2 - y1, x2 - x1), 3), k])
-portals = [[round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(a, 3)] for x, y, a in portals if AREA.contains(Point(x, y))]
+portals = [[round(x, 2), round(y, 2), round(float(ground(x, y)), 2), round(a, 3), hw] for x, y, a, hw in portals if AREA.contains(Point(x, y))]
 if os.path.exists('assets/potrubi.json'):         # nadzemní potrubí (nastroje/kominy.py)
     lines_out['pipe'] = []
     _skp = [Point(*to_local(lo, la)) for la, lo in UP.get('skryt_potrubi', [])]   # potrubí, které v datech vede nad zemí, ale ve skutečnosti ne

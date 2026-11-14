@@ -1101,12 +1101,12 @@ function roofDeco(b, X, eave, rc) {
       }
     }
   });
-  for (const [x, y, z, a] of scene.portals || []) {           // portál tunelu: betonový rám a tma uvnitř, čelem k silnici
-    const f = frameAt(x, y, z, a), W = [0, 1, 0, 0], C = [0.56, 0.55, 0.52];
-    pushBox(L, f, -1.5, 0.2, -6.6, 6.6, -0.5, 5.2, [0.05, 0.05, 0.06], W);
-    pushBox(L, f, -1.6, 0.4, -7.6, -6.4, -0.5, 6.4, C, W);
-    pushBox(L, f, -1.6, 0.4, 6.4, 7.6, -0.5, 6.4, C, W);
-    pushBox(L, f, -1.6, 0.4, -7.6, 7.6, 5.2, 6.4, C, W);
+  for (const [x, y, z, a, hw = 6.6] of scene.portals || []) {           // portál tunelu: betonový rám a tma uvnitř, čelem k silnici (hw = polovina světlé šířky)
+    const f = frameAt(x, y, z, a), W = [0, 1, 0, 0], C = [0.56, 0.55, 0.52], h = hw >= 6 ? 5.2 : 4.6;
+    pushBox(L, f, -1.5, 0.2, -hw, hw, -0.5, h, [0.05, 0.05, 0.06], W);
+    pushBox(L, f, -1.6, 0.4, -hw - 1, -hw + 0.2, -0.5, h + 1.2, C, W);
+    pushBox(L, f, -1.6, 0.4, hw - 0.2, hw + 1, -0.5, h + 1.2, C, W);
+    pushBox(L, f, -1.6, 0.4, -hw - 1, hw + 1, h, h + 1.2, C, W);
   }
   for (const [x, y, z, a, k] of scene.buses || []) {          // stojící autobusy na nádraží
     const f = frameAt(x, y, z, a), W = [0, 1, 1, 0];

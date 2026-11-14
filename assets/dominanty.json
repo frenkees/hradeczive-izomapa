@@ -1440,5 +1440,473 @@
    "h": 9,
    "win": 3
   }
+ },
+ {
+  "name": "Zbrojnice",
+  "lat": 50.20832,
+  "lon": 15.83722,
+  "text": "Zbrojnice: dlouhá třípodlažní budova se světle žlutou fasádou a červenou valbovou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    228,
+    222,
+    150
+   ],
+   "rc": [
+    176,
+    90,
+    60
+   ],
+   "r": "hipped",
+   "h": 13,
+   "win": 3,
+   "rh": 5
+  }
+ },
+ {
+  "name": "Žižkova pěchotní kasárna",
+  "lat": 50.20814,
+  "lon": 15.83413,
+  "text": "Žižkova pěchotní kasárna: bílá omítaná budova s kamenným soklem a šedou valbovou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    236,
+    232,
+    222
+   ],
+   "rc": [
+    130,
+    132,
+    136
+   ],
+   "r": "hipped",
+   "h": 11,
+   "win": 2,
+   "rh": 5
+  }
+ },
+ {
+  "name": "Archa",
+  "lat": 50.21248,
+  "lon": 15.8314,
+  "text": "Archa: žlutá budova s červenou valbovou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    232,
+    200,
+    100
+   ],
+   "rc": [
+    176,
+    90,
+    60
+   ],
+   "r": "hipped",
+   "h": 12,
+   "win": 3,
+   "rh": 4
+  }
+ },
+ {
+  "name": "Divadlo Drak",
+  "lat": 50.2077,
+  "lon": 15.8385,
+  "text": "Divadlo Drak: krémová budova s červenou střechou a vysokým štítem. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    240,
+    228,
+    200
+   ],
+   "rc": [
+    150,
+    50,
+    54
+   ],
+   "r": "gabled",
+   "h": 8,
+   "win": 3,
+   "rh": 6
+  }
+ },
+ {
+  "name": "Odborná škola uměleckého zámečnictví",
+  "lat": 50.21119,
+  "lon": 15.83826,
+  "text": "Budova Odborné školy pro umělecké zámečnictví: světlá historizující budova s tmavou kupolí v nároží. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    232,
+    224,
+    200
+   ],
+   "rc": [
+    90,
+    92,
+    96
+   ],
+   "r": "hipped",
+   "h": 17,
+   "win": 4,
+   "rh": 4,
+   "towers": [
+    {
+     "at": "front",
+     "side": -12,
+     "w": 5,
+     "h": 17,
+     "top": "dome",
+     "to": 22,
+     "tc": [
+      50,
+      52,
+      60
+     ],
+     "wc": [
+      232,
+      224,
+      200
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "Střední průmyslová škola stavební",
+  "lat": 50.2142,
+  "lon": 15.8417,
+  "text": "Střední průmyslová škola stavební: bílá funkcionalistická budova s pásy oken. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    238,
+    236,
+    228
+   ],
+   "rc": [
+    140,
+    140,
+    140
+   ],
+   "r": "flat",
+   "h": 17,
+   "win": 3
+  }
+ },
+ {
+  "name": "Vila Fuchsových",
+  "lat": 50.21034,
+  "lon": 15.81776,
+  "text": "Vila Fuchsových: bílá funkcionalistická vila s terasou a převislou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    240,
+    238,
+    232
+   ],
+   "rc": [
+    180,
+    110,
+    80
+   ],
+   "r": "hipped",
+   "h": 9,
+   "win": 3,
+   "rh": 2
+  }
+ },
+ {
+  "name": "Vila Bedřicha Honzáka",
+  "lat": 50.20718,
+  "lon": 15.83861,
+  "text": "Vila Bedřicha Honzáka: bílá vila s tmavou břidlicovou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    236,
+    234,
+    228
+   ],
+   "rc": [
+    70,
+    76,
+    84
+   ],
+   "r": "hipped",
+   "h": 8,
+   "win": 3,
+   "rh": 5
+  }
+ },
+ {
+  "name": "Vila manželů Nepasických",
+  "lat": 50.20983,
+  "lon": 15.81894,
+  "text": "Vila manželů Nepasických: světlá vila s tmavě hnědou valbovou střechou a štíty. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    236,
+    232,
+    222
+   ],
+   "rc": [
+    80,
+    60,
+    54
+   ],
+   "r": "hipped",
+   "h": 10,
+   "win": 3,
+   "rh": 6
+  }
+ },
+ {
+  "name": "Píšova vila",
+  "lat": 50.20947,
+  "lon": 15.81875,
+  "text": "Píšova vila: žlutá vila s oranžovou střechou a zelenými prvky. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    232,
+    226,
+    170
+   ],
+   "rc": [
+    196,
+    110,
+    60
+   ],
+   "r": "hipped",
+   "h": 8,
+   "win": 3,
+   "rh": 6
+  }
+ },
+ {
+  "name": "Klicperova 4",
+  "lat": 50.20982,
+  "lon": 15.83388,
+  "text": "Klicperova 4: šedý nárožní činžovní dům s věžičkami a hnědou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    150,
+    146,
+    140
+   ],
+   "rc": [
+    140,
+    80,
+    60
+   ],
+   "r": "hipped",
+   "h": 20,
+   "win": 3,
+   "rh": 5
+  }
+ },
+ {
+  "name": "Dům U Špuláků",
+  "lat": 50.2088,
+  "lon": 15.83266,
+  "text": "Dům U Špuláků: barokní měšťanský palác s krémovou fasádou a tmavě červenou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    238,
+    234,
+    220
+   ],
+   "rc": [
+    130,
+    66,
+    52
+   ],
+   "r": "hipped",
+   "h": 14,
+   "win": 4,
+   "rh": 6
+  }
+ },
+ {
+  "name": "Dům U Švagerků",
+  "lat": 50.21058,
+  "lon": 15.80996,
+  "text": "Dům U Švagerků: nárožní měšťanský dům se světlou fasádou a oranžovou valbovou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    238,
+    232,
+    218
+   ],
+   "rc": [
+    186,
+    90,
+    60
+   ],
+   "r": "hipped",
+   "h": 14,
+   "win": 3,
+   "rh": 5
+  }
+ },
+ {
+  "name": "Dělnický dům",
+  "lat": 50.22234,
+  "lon": 15.78652,
+  "text": "Dělnický dům: krémová budova s oranžovou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    226,
+    212,
+    170
+   ],
+   "rc": [
+    196,
+    100,
+    56
+   ],
+   "r": "hipped",
+   "h": 9,
+   "win": 3,
+   "rh": 6
+  }
+ },
+ {
+  "name": "Rolnická a odborná škola hospodářská v Kuklenách",
+  "lat": 50.20893,
+  "lon": 15.80211,
+  "text": "Budova školy v Kuklenách: světlá fasáda s červenooranžovou střechou a vikýři. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    232,
+    224,
+    196
+   ],
+   "rc": [
+    206,
+    90,
+    56
+   ],
+   "r": "hipped",
+   "h": 12,
+   "win": 3,
+   "rh": 6
+  }
+ },
+ {
+  "name": "Státní odborná škola koželužská",
+  "lat": 50.20527,
+  "lon": 15.83228,
+  "text": "Budova Státní odborné školy koželužské: cihlová funkcionalistická budova s vysokou věží. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    140,
+    64,
+    50
+   ],
+   "rc": [
+    96,
+    90,
+    86
+   ],
+   "r": "flat",
+   "h": 18,
+   "win": 3,
+   "towers": [
+    {
+     "at": "front",
+     "side": -8,
+     "w": 5,
+     "h": 26,
+     "top": "none",
+     "wc": [
+      140,
+      64,
+      50
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "Novákovy garáže",
+  "lat": 50.21397,
+  "lon": 15.82621,
+  "text": "Novákovy garáže: bílá funkcionalistická budova se zakulaceným nárožím a pásovými okny. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    232,
+    230,
+    224
+   ],
+   "rc": [
+    150,
+    150,
+    150
+   ],
+   "r": "flat",
+   "h": 12,
+   "win": 3
+  }
+ },
+ {
+  "name": "Aupark Hradec Králové",
+  "lat": 50.21256,
+  "lon": 15.81173,
+  "text": "Aupark: obchodní centrum s modrou prosklenou fasádou a oranžovými částmi. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    90,
+    116,
+    150
+   ],
+   "rc": [
+    150,
+    150,
+    150
+   ],
+   "r": "flat",
+   "h": 18,
+   "win": 5
+  }
+ },
+ {
+  "name": "OC Futurum Hradec Králové",
+  "lat": 50.197,
+  "lon": 15.849,
+  "text": "OC Futurum: obchodní centrum s cihlovou a prosklenou fasádou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    160,
+    84,
+    70
+   ],
+   "rc": [
+    150,
+    150,
+    150
+   ],
+   "r": "flat",
+   "h": 12,
+   "win": 5
+  }
+ },
+ {
+  "name": "Obchodní centrum Atrium",
+  "lat": 50.21319,
+  "lon": 15.81871,
+  "text": "Obchodní centrum Atrium: oranžová perforovaná fasáda. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    206,
+    120,
+    60
+   ],
+   "rc": [
+    150,
+    150,
+    150
+   ],
+   "r": "flat",
+   "h": 16,
+   "win": 2
+  }
  }
 ]

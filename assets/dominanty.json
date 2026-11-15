@@ -543,28 +543,6 @@
   }
  },
  {
-  "name": "Studijní a vědecká knihovna",
-  "lat": 50.205188,
-  "lon": 15.831408,
-  "text": "Studijní a vědecká knihovna (Projektil, 2008): pohledový beton ve tvaru X, rozházená kruhová okna, zlatavé lamely nad vstupem. Podle fotek z archiweb.cz a tzb-info.cz.",
-  "spec": {
-   "lm": "knihovna",
-   "wc": [
-    190,
-    188,
-    182
-   ],
-   "rc": [
-    150,
-    150,
-    148
-   ],
-   "r": "flat",
-   "h": 17.4,
-   "win": 2
-  }
- },
- {
   "name": "Městské lázně",
   "lat": 50.214351,
   "lon": 15.828813,
@@ -1907,6 +1885,431 @@
    "r": "flat",
    "h": 16,
    "win": 2
+  }
+ },
+ {
+  "name": "Budova Magistrátu města Hradec Králové",
+  "lat": 50.21269,
+  "lon": 15.83657,
+  "text": "Budova Magistrátu města Hradec Králové: béžová čtyřpodlažní kancelářská budova s pásy oken. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    204,
+    194,
+    168
+   ],
+   "rc": [
+    130,
+    130,
+    130
+   ],
+   "r": "flat",
+   "h": 18,
+   "win": 3
+  }
+ },
+ {
+  "name": "Bývalé ředitelství státních drah",
+  "lat": 50.21016,
+  "lon": 15.82203,
+  "text": "Bývalé ředitelství státních drah: rozlehlá šedohnědá administrativní budova s pravidelnými okny a ustoupeným horním patrem. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    160,
+    148,
+    132
+   ],
+   "rc": [
+    110,
+    110,
+    110
+   ],
+   "r": "flat",
+   "h": 22,
+   "win": 3
+  }
+ },
+ {
+  "name": "Steinského palác",
+  "lat": 50.21109,
+  "lon": 15.8223,
+  "text": "Steinského palác: funkcionalistická budova s pískovcovým obkladem a reliéfem nad okny. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    210,
+    184,
+    140
+   ],
+   "rc": [
+    130,
+    130,
+    130
+   ],
+   "r": "flat",
+   "h": 18,
+   "win": 3
+  }
+ },
+ {
+  "name": "Weinhengstův dům",
+  "lat": 50.21019,
+  "lon": 15.82896,
+  "text": "Weinhengstův dům: secesně-historizující nájemní dům se štíty a bohatě zdobenou fasádou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    222,
+    204,
+    172
+   ],
+   "rc": [
+    160,
+    92,
+    72
+   ],
+   "r": "gabled",
+   "h": 17,
+   "win": 4,
+   "rh": 5
+  }
+ },
+ {
+  "name": "Rejchlův dům",
+  "lat": 50.21124,
+  "lon": 15.83056,
+  "text": "Rejchlův dům: třípodlažní funkcionalistický dům se šedou fasádou a pásem balkonů. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    178,
+    172,
+    164
+   ],
+   "rc": [
+    120,
+    120,
+    120
+   ],
+   "r": "flat",
+   "h": 13,
+   "win": 3
+  }
+ },
+ {
+  "name": "Činžovní dům Josefa Jihlavce I",
+  "lat": 50.21114,
+  "lon": 15.83044,
+  "text": "Činžovní dům Josefa Jihlavce I: světlý obchodní dům se sloupovým průčelím a obloukovým balkonem. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    206,
+    192,
+    166
+   ],
+   "rc": [
+    120,
+    120,
+    120
+   ],
+   "r": "flat",
+   "h": 15,
+   "win": 3
+  }
+ },
+ {
+  "name": "Knihovna města Hradce Králové",
+  "lat": 50.21623,
+  "lon": 15.82182,
+  "text": "Knihovna města Hradce Králové: nízká světlá budova s velkými prosklenými okny a zelenými pásy. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    226,
+    230,
+    214
+   ],
+   "rc": [
+    140,
+    140,
+    140
+   ],
+   "r": "flat",
+   "h": 10,
+   "win": 5
+  }
+ },
+ {
+  "name": "Studijní a vědecká knihovna",
+  "lat": 50.20519,
+  "lon": 15.8314,
+  "text": "Studijní a vědecká knihovna: bílošedá moderní budova s kruhově perforovanou fasádou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    232,
+    232,
+    226
+   ],
+   "rc": [
+    150,
+    150,
+    150
+   ],
+   "r": "flat",
+   "h": 18,
+   "win": 3
+  }
+ },
+ {
+  "name": "Střední zdravotnická škola",
+  "lat": 50.20891,
+  "lon": 15.83674,
+  "text": "Střední zdravotnická škola: žlutá historizující budova s červenou střechou a vysokými okny. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    228,
+    188,
+    98
+   ],
+   "rc": [
+    170,
+    72,
+    52
+   ],
+   "r": "hipped",
+   "h": 16,
+   "win": 5,
+   "rh": 5
+  }
+ },
+ {
+  "name": "Anglobanka",
+  "lat": 50.21226,
+  "lon": 15.82407,
+  "text": "Anglobanka: rozlehlá krémová budova s řadou oken a nízkou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    226,
+    212,
+    172
+   ],
+   "rc": [
+    150,
+    120,
+    100
+   ],
+   "r": "hipped",
+   "h": 20,
+   "win": 3,
+   "rh": 3
+  }
+ },
+ {
+  "name": "Hotel U Královny Elišky",
+  "lat": 50.21083,
+  "lon": 15.8363,
+  "text": "Hotel U Královny Elišky: měšťanský dům se žlutozelenou fasádou, červenou střechou a vikýři. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    210,
+    200,
+    122
+   ],
+   "rc": [
+    176,
+    86,
+    60
+   ],
+   "r": "gabled",
+   "h": 13,
+   "win": 4,
+   "rh": 5
+  }
+ },
+ {
+  "name": "Městská plynárna Kukleny",
+  "lat": 50.21013,
+  "lon": 15.8068,
+  "text": "Městská plynárna Kukleny: cihlová věžová budova s reklamou na vrcholu. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    170,
+    86,
+    62
+   ],
+   "rc": [
+    120,
+    120,
+    120
+   ],
+   "r": "flat",
+   "h": 20,
+   "win": 2
+  }
+ },
+ {
+  "name": "Obchodní dům Prior",
+  "lat": 50.21298,
+  "lon": 15.8177,
+  "text": "Obchodní dům Prior: hnědošedý obchodní dům s hladkou fasádou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    152,
+    134,
+    114
+   ],
+   "rc": [
+    110,
+    110,
+    110
+   ],
+   "r": "flat",
+   "h": 18,
+   "win": 2
+  }
+ },
+ {
+  "name": "Pražskopředměstská radnice",
+  "lat": 50.21222,
+  "lon": 15.81481,
+  "text": "Pražskopředměstská radnice: třípodlažní budova s béžovou fasádou a valbovou střechou. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    200,
+    190,
+    170
+   ],
+   "rc": [
+    120,
+    62,
+    52
+   ],
+   "r": "hipped",
+   "h": 15,
+   "win": 4,
+   "rh": 4
+  }
+ },
+ {
+  "name": "Městské lázně - Aquacentrum",
+  "lat": 50.21438,
+  "lon": 15.82885,
+  "text": "Městské lázně - Aquacentrum: bílá funkcionalistická budova s pásy oken u řeky. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    236,
+    234,
+    226
+   ],
+   "rc": [
+    140,
+    140,
+    140
+   ],
+   "r": "flat",
+   "h": 11,
+   "win": 4
+  }
+ },
+ {
+  "name": "Dům U skleněné věže",
+  "lat": 50.21408,
+  "lon": 15.82014,
+  "text": "Dům U skleněné věže: okrová budova s prosklenou schodišťovou věží. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    220,
+    172,
+    110
+   ],
+   "rc": [
+    130,
+    130,
+    130
+   ],
+   "r": "flat",
+   "h": 15,
+   "win": 3
+  }
+ },
+ {
+  "name": "Vila Václava Charváta",
+  "lat": 50.2107,
+  "lon": 15.81934,
+  "text": "Vila Václava Charváta: šedobílá funkcionalistická vila s hranolovou věží a okenními arkýři. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    210,
+    206,
+    198
+   ],
+   "rc": [
+    110,
+    110,
+    110
+   ],
+   "r": "flat",
+   "h": 12,
+   "win": 3
+  }
+ },
+ {
+  "name": "Kostel svatého Pavla (Pouchov)",
+  "lat": 50.23048,
+  "lon": 15.84673,
+  "text": "Kostel svatého Pavla (Pouchov): žlutý kostel s červenou sedlovou střechou a věží s cibulovou bání. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    236,
+    206,
+    112
+   ],
+   "rc": [
+    188,
+    84,
+    56
+   ],
+   "r": "gabled",
+   "h": 9,
+   "win": 7,
+   "towers": [
+    {
+     "at": "front",
+     "side": 0,
+     "w": 4.5,
+     "h": 14,
+     "top": "helm",
+     "to": 22,
+     "tc": [
+      160,
+      50,
+      40
+     ],
+     "wc": [
+      236,
+      206,
+      112
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "Vojenská nemocnice",
+  "lat": 50.2109,
+  "lon": 15.8333,
+  "text": "Vojenská nemocnice: šedá čtyřpodlažní budova s červenými rámy oken. Model podle fotky z Wikimedia Commons; barvy a výšky jsou odhad.",
+  "spec": {
+   "wc": [
+    178,
+    174,
+    162
+   ],
+   "rc": [
+    120,
+    70,
+    60
+   ],
+   "r": "hipped",
+   "h": 15,
+   "win": 4,
+   "rh": 4
   }
  }
 ]

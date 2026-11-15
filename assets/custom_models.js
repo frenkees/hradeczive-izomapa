@@ -852,3 +852,41 @@ export const landmarks = {
     return true;
   },
 };
+
+// ---------- velikonoční vajíčko: zaparkovaná auta (props.egg = [x, y, z, úhel, typ]; + je přední část vozu) ----------
+// zjednodušené karoserie: dolní kastle, nižší kapota, kabina jako komolý jehlan (čelní sklo, střecha, zadní okno), kola, světla
+const EGG_CARS = [
+  // název, barva, L, W, pás, střecha, kapota, [xf0, xf1, xr1, xr0] kabiny
+  ['rx8',    [0.72, 0.10, 0.10], 4.43, 1.77, 0.95, 1.35, 0.84, [0.60, -0.15, -1.15, -1.55]],
+  ['rx7',    [0.93, 0.93, 0.91], 4.29, 1.76, 0.86, 1.23, 0.70, [0.35, -0.40, -1.05, -1.55]],
+  ['p106',   [0.40, 0.17, 0.55], 3.68, 1.59, 0.95, 1.38, 0.86, [0.45, -0.05, -1.35, -1.52]],
+  ['p106gt', [0.76, 0.10, 0.10], 3.68, 1.59, 0.95, 1.38, 0.86, [0.45, -0.05, -1.35, -1.52]],
+  ['x1',     [0.20, 0.22, 0.25], 4.45, 1.82, 1.05, 1.60, 0.95, [0.70, 0.10, -1.70, -1.95]],
+  ['m140',   [0.16, 0.30, 0.62], 4.32, 1.77, 0.95, 1.41, 0.86, [0.55, -0.05, -1.20, -1.55]],
+  ['gt86',   [0.78, 0.10, 0.10], 4.24, 1.78, 0.88, 1.29, 0.76, [0.45, -0.25, -1.15, -1.55]],
+];
+export const EGG_TYPES = EGG_CARS.map((c) => c[0]);
+export function buildProps(P, { make, inst, F, pushBox, pushQuad, pushTri }) {
+  const items = P.egg || [];
+  if (!items.length) return;
+  const GLASS = [0.16, 0.20, 0.26], DARK = [0.10, 0.10, 0.11], FIX = [0, 1, 0, 0], FIXS = [0, 1, 1, 0];
+  EGG_CARS.forEach(([, col, L, W, belt, roof, hood, [xf0, xf1, xr1, xr0]], ti) => {
+    const mine = items.filter((it) => it[4] === ti);
+    if (!mine.length) return;
+    const g = make((B) => {
+      const z0 = 0.28, hl = L / 2, hw = W / 2;
+      pushBox(B, F, -hl, 0.45 * hl, -hw, hw, z0, belt, col, FIX);                       // trup
+      pushBox(B, F, 0.45 * hl, hl, -hw + 0.04, hw - 0.04, z0, hood, col, FIX);            // kapota
+      const wb = hw - 0.12, wr = wb - 0.16;
+      pushQuad(B, F(xr1, -wr, roof), F(xf1, -wr, roof), F(xf1, wr, roof), F(xr1, wr, roof), col, FIXS);          // střecha
+      pushQuad(B, F(xf0, wb, belt), F(xr0, wb, belt), F(xr1, wr, roof), F(xf1, wr, roof), GLASS, FIX);             // bok vlevo
+      pushQuad(B, F(xr0, -wb, belt), F(xf0, -wb, belt), F(xf1, -wr, roof), F(xr1, -wr, roof), GLASS, FIX);         // bok vpravo
+      pushQuad(B, F(xf0, -wb, belt), F(xf0, wb, belt), F(xf1, wr, roof), F(xf1, -wr, roof), GLASS, FIX);           // čelní sklo
+      pushQuad(B, F(xr0, wb, belt), F(xr0, -wb, belt), F(xr1, -wr, roof), F(xr1, wr, roof), GLASS, FIX);           // zadní okno
+      for (const s of [-0.31 * L, 0.31 * L]) for (const t of [-hw + 0.02, hw - 0.02]) pushBox(B, F, s - 0.32, s + 0.32, t - 0.1, t + 0.1, 0, 0.62, DARK, FIX);   // kola
+      for (const t of [-hw + 0.1, hw - 0.5]) pushBox(B, F, -hl - 0.02, -hl + 0.06, t, t + 0.4, belt - 0.22, belt - 0.1, [0.9, 0.12, 0.10], [0.8, 1, 0, 0]);    // zadní světla
+      for (const t of [-hw + 0.1, hw - 0.5]) pushBox(B, F, hl - 0.06, hl + 0.02, t, t + 0.4, hood - 0.2, hood - 0.08, [0.95, 0.92, 0.75], [0.3, 1, 0, 0]);    // přední světla
+    });
+    inst(g, mine, (it) => [it[0], it[1], it[2], it[3]], null);
+  });
+}

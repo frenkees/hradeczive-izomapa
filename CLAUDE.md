@@ -133,6 +133,12 @@ Ukazuj uživateli výřezy před a po.
   silnice a končí na břehu. Podjezdná výška se měří od terénu cesty pod mostem (pěšině stačí 3 m); křížení ve společném uzlu sítě je úrovňové.
   Nájezd nepokračuje přes křižovatku; konec mostu z dat, který leží na terénu, se vrací mezi cesty. Plot nebo zábradlí z dat v pásu mostovky
   a nad vodou se nekreslí (`on_bridge`).
+  Mostovky se počítají společně (`_PP`, `_abut`, `_niveleta`): konec kusu, který leží na jiné mostovce stejného druhu (uzel rozdělené
+  estakády, sjezd z mostu; do max(2 m, šířka/2 + 1 m) od její osy), nepřistává na terén a všechny kusy mají v uzlu stejnou výšku (nejvyšší
+  z nich, počítá se opakovaně); sjezd pak klesá přímo z výšky uzlu ke své opěře. Souběžné kusy (do 20 m, aspoň 70 % délky: pásy pro každý
+  směr, chodníky vedené zvlášť) mají společnou úroveň opěr (nejvyšší) a ve stejném místě stejnou výšku, takže desky jednoho mostu nemají schodek.
+  Zářez pod mostem (terén podél cesty pod mostovkou klesne na spojnici výšek cesty před mostem a za ním) se nedělá pro vlastní nájezd
+  mostu ani pro cestu vedenou podél jeho osy – podkopal by opěru a konec mostovky by visel ve vzduchu.
   Nájezdy (žádné „skokánky“): mostovka pokračuje do navazující cesty stejného druhu (i když most končí uprostřed segmentu, až 8 kusů / 200 m)
   a výška nad terénem klesá nejvýš o `GRADE` (silnice 6 %, trať 3 %, lávka 8 %) – nájezd tak kopíruje svah. Ta část cesty se pak
   nekreslí do terénu (auta jedou po mostovce). Navazující kusy jednoho mostu se nejdřív spojí (linemerge). Bez navazující cesty

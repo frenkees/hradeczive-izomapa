@@ -368,14 +368,17 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
         #      a osa se posune k chodníku, ať pás chodníku nezůstane namalovaný na hladině. Stejně lávka: v datech má šířku
         #      pěšiny, v pasportu je to širší plocha (okraje by zůstaly namalované pod lávkou jako dvě čáry do vody).
         _wsh = _MM_W.buffer(-0.5)
-        _foot_rd = [D[0].buffer(D[4] / 2, cap_style='flat') for D in DECKS if D[5] == 'road']
-        _Usw = U.intersection(_wsh).difference(shapely.unary_union(_foot_rd)) if _foot_rd and not U.is_empty else Polygon()
+        #      Pás jiné mostovky (druhý směr, chodník vedený v datech jako zvláštní lávka) se nepřekrývá: rozšíření končí u jejího
+        #      okraje a plochu mezi dvěma mostovkami dostane ta, která je na řadě dřív (jinak by ležely dvě desky přes sebe).
+        _pasy = [D[0].buffer(D[4] / 2, cap_style='flat') if D[5] != 'rail' else Polygon() for D in DECKS]
+        _Usw = U.intersection(_wsh).difference(shapely.unary_union([b_ for b_, D in zip(_pasy, DECKS) if D[5] == 'road'])) if any(D[5] == 'road' for D in DECKS) and not U.is_empty else Polygon()
         _Uswp = shapely.prepared.prep(_Usw)
         _nwid = 0
         for _di, D in enumerate(DECKS):
             if D[5] == 'rail' or _Usw.is_empty or not (len(D) > 8 and D[8]): continue
             _xy = np.array(D[0].coords)[:, :2]; _z = np.asarray(D[2]); _g = np.asarray(D[3])
             if len(_xy) != len(_z) or len(_xy) < 3: continue
+            _jine = shapely.prepared.prep(shapely.unary_union([b_ for k_, b_ in enumerate(_pasy) if k_ != _di and b_.intersects(D[0].buffer(D[4] / 2 + 9.0))] or [Polygon()]))
             _nrm = np.zeros_like(_xy)
             for k in range(len(_xy)):
                 t_ = _xy[min(k + 1, len(_xy) - 1)] - _xy[max(k - 1, 0)]; t_ = t_ / (np.hypot(*t_) or 1)
@@ -386,7 +389,8 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
                 for sd in (1, -1):
                     last, o = None, D[4] / 2
                     while o < D[4] / 2 + 8.0:
-                        if _Uswp.contains(Point(*(_xy[k] + _nrm[k] * sd * o))): last = o
+                        _q = Point(*(_xy[k] + _nrm[k] * sd * o))
+                        if _Uswp.contains(_q) and not _jine.contains(_q): last = o
                         elif (last is None and o > D[4] / 2 + 1.0) or (last is not None and o - last > 0.75): break
                         o += 0.25
                     _ext[sd].append(0.0 if last is None else last - D[4] / 2 + 0.25)
@@ -396,6 +400,7 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             if not (eL or eR): continue
             _sh = (eL - eR) / 2
             DECKS[_di] = (LineString(_xy + _nrm * _sh), D[1], D[2], D[3], round(D[4] + eL + eR, 2), *D[5:]); _nwid += 1
+            _pasy[_di] = DECKS[_di][0].buffer(DECKS[_di][4] / 2, cap_style='flat')
         if _nwid: print('MMHK: mostů a lávek rozšířených o chodník z pasportu', _nwid)
         # 5b) pod mostovkou (výš než 1 m nad terénem) povrch z doby před pasportem: plocha vozovky a chodníku na mostě
         #     se jinak namaluje i na zem, vodu nebo koleje pod ním (silnice z OSM se pod mosty nekreslí už v prep.py)
@@ -457,6 +462,10 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             if not (AREA.contains(q) and _MM_PILP.contains(q)) or _PRE_ZP.contains(q): continue
             nd_ = nearest_dir(q, all_tree, all_lines, 15); a_ = nd_[0] if nd_ else 0.0
             inw = _w05.contains(q); r_ = _on_deck(q, 4.0 if inw else 3.0)
+            # lampy podchodu leží v pasportu pod vozovkou: stožár uprostřed jízdních pruhů (mimo mostovku) se nekreslí
+            if r_ is None:
+                _px, _py = pix(x, y)
+                if (0 <= _px < TWE and 0 <= _py < TWE and _A[_py, _px] in (C['road'], C['marking'])) or                    any(drive_lines[int(k_)][1] / 2 - 0.6 > drive_lines[int(k_)][0].distance(q) for k_ in drive_tree.query(q.buffer(12))): continue
             if inw and r_ is not None:
                 _rows.append((r_[1], r_[2])); props['lamp'].append([r_[3], r_[4], r_[5], a_]); _nl += 1; _nm += 1
             elif r_ is not None: _wait.append((x, y, a_, r_))
@@ -483,10 +492,24 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             return not (0 <= px_ < TWE and 0 <= py_ < TWE and _GREEN[py_, px_])
         cars[:] = [c_ for c_ in cars if _keep(c_)]
         _ncr = _nc0 - len(cars); _nca = 0
+        _vozovka = 0
         for (x, y), (x2, y2) in zip(_sxy, _sxy2):
             if not AREA.contains(Point(x, y)): continue
+            # stání z pasportu, které leží uprostřed dnešní vozovky (silnice se od pasportu přestavěla), auto nedostane: stálo by v jízdních pruzích
+            _q_ = Point(x, y); _px, _py = pix(x, y)
+            if (0 <= _px < TWE and 0 <= _py < TWE and _A[_py, _px] in (C['road'], C['marking'])) or any(drive_lines[int(k_)][2] != 'service' and drive_lines[int(k_)][0].distance(_q_) < drive_lines[int(k_)][1] / 2 - 1.0
+                   for k_ in drive_tree.query(_q_.buffer(14))):
+                _vozovka += 1; continue
             cars.append([round(float(x), 2), round(float(y), 2), round(float(ground(x, y)), 2), round(math.atan2(y2 - y, x2 - x), 3),
                          int(h01('car' + wkey(x, y)) * 8) % 8]); _nca += 1
+        # auto stojící na vozovce vedle čar značení (víceproudá silnice, kterou odhad aut bere za úzkou ulici): pryč
+        _rm = max(2, int(round(1.4 / TEX_RES))); _n_r = len(cars)
+        def _na_vozovce(c_):
+            px_, py_ = pix(c_[0], c_[1])
+            if not (_rm <= px_ < TWE - _rm and _rm <= py_ < TWE - _rm) or _A[py_, px_] != C['road']: return False
+            return bool((_A[py_ - _rm:py_ + _rm + 1, px_ - _rm:px_ + _rm + 1] == C['marking']).any())
+        cars[:] = [c_ for c_ in cars if not _na_vozovce(c_)]
+        print('MMHK: aut na vozovce vedle značení pryč', _n_r - len(cars))
         # 8) zábradlí (DTMM), ne na mostech a nad vodou; na nábřežní zdi o římsu výš. Zábradlí mostu vede v pasportu i nad břehem
         #    pod mostem (na terénu by sbíhalo po svahu do vody): část v pásu mostovky nad terénem a část nad vodou se vynechá,
         #    mostovka má vlastní zábradlí
@@ -526,7 +549,7 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
                         if len(_run) > 1: lines_out['fence'].append(_run); _nz += 1
                         _run = []
         print('MMHK: povrchů', len(_MM_POV), 'zeleně', len(_MM_ZEL), 'značení px', int((S == C['marking']).sum()),
-              'lamp', _nl, 'místo', _nr, '| aut na stáních', _nca, 'odebráno', _ncr, '| zábradlí', _nz)
+              'lamp', _nl, 'místo', _nr, '| aut na stáních', _nca, 'odebráno', _ncr, 've vozovce', _vozovka, '| zábradlí', _nz)
 
 # ---- vlastní modely mostů a lávek: stromy v jejich pásu pryč (koruna by prorůstala mostovkou) ----
 # dominanty.json "spec": {"bez_stromu": [{"q": [[lat, lon], ...], "w": šířka pásu v m}]}; strom se skryje (kind 2, pořadí barev zůstane),
@@ -540,3 +563,21 @@ if HOOK == 'cemetery':
             P_ = Point(t[0], t[1])
             if any(l.distance(P_) < w / 2 + t[3] * (0.2 if t[4] else 0.33) for l, w in _bz): t[5] = 2; _nb += 1
         print('stromů v pásu vlastních mostů skryto', _nb)
+
+# ---- velikonoční vajíčko: dvě skupiny zaparkovaných aut s vlastními modely (render.html -> custom_models.js buildProps) ----
+# typy: 0 Mazda RX-8 (červená), 1 Mazda RX-7 FD, 2 Peugeot 106 (fialový), 3 Peugeot 106 GT (červený), 4 BMW X1, 5 BMW M140i, 6 Toyota GT86 (červená)
+# poloha: kotva (lat, lon) + posun v metrech (východ, sever) odečtený z ortofota, úhel = směr přídě (0 = východ, proti hodinám)
+if HOOK == 'props':
+    _EGGS = [
+        ((50.22974, 15.84042), [(-1.4, -6.1, -0.90, 0), (1.7, -9.9, -0.90, 1)]),                       # parkoviště před domem: RX-8 a RX-7 FD vedle sebe
+        ((50.22093, 15.84650), [(12.5, 7.5, math.pi, 2), (12.5, 5.0, math.pi, 3), (12.5, 2.5, math.pi, 4),
+                                (12.5, -0.25, math.pi, 5), (12.5, -3.0, math.pi, 6)]),                    # řada stání u druhého domu
+    ]
+    props['egg'] = []
+    for (_la, _lo), _cs in _EGGS:
+        for _dx, _dy, _an, _ty in _cs:
+            _x, _y = (float(v) for v in to_local(_lo + _dx / geo.KX, _la + _dy / 110574.0))
+            if not AREA.contains(Point(_x, _y)): continue
+            cars[:] = [c_ for c_ in cars if math.hypot(c_[0] - _x, c_[1] - _y) > 2.0]          # auto z odhadu na stejném stání pryč
+            props['egg'].append([round(_x, 2), round(_y, 2), round(float(ground(_x, _y)), 2), round(_an, 3), _ty])
+    if props['egg']: print('vajíčko: aut', len(props['egg']))

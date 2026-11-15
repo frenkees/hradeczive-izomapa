@@ -205,6 +205,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   transition: transform .1s ease, background .1s ease;
 }
 .card-neighbor-btn:hover, .card-neighbor-btn:focus-visible { background: #ffe08a; transform: translateY(-1px); }
+.card .links a.card-report-btn { flex-basis: 100%; text-align: center; color: var(--ink); background: var(--panel-2); border: 2px solid var(--edge); padding: 5px 8px; text-decoration: none; font-weight: 700; }
+.card .links a.card-report-btn:hover, .card .links a.card-report-btn:focus-visible { border-color: var(--lamp); color: var(--lamp); }
 .nolabels .pin, .far .pin:not(.need):not(.neighbor) { display: none !important; }
 .loading { position: fixed; inset: 0; display: grid; place-items: center; font-family: var(--display); color: var(--muted); z-index: 1; pointer-events: none; }
 .mbar { display: none; }
@@ -830,6 +832,15 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const s = document.createElement('a'); s.target = '_blank'; s.rel = 'noopener';
     s.href = `https://mapy.cz/letecka?x=${lon.toFixed(6)}&y=${lat.toFixed(6)}&z=19`; s.textContent = 'Letecký snímek';
     links.append(a, s);
+    // návrh změny / hlášení chyby: předvyplněné issue v repozitáři projektu (odkaz na pohled se doplní až při kliknutí, protože se mezitím mohl pohled posunout)
+    const rb = document.createElement('a'); rb.className = 'card-report-btn'; rb.target = '_blank'; rb.rel = 'noopener';
+    rb.textContent = 'Navrhnout změnu / nahlásit chybu';
+    const issueUrl = () => {
+      const body = ['**Co tu nesedí nebo co navrhuji změnit:**', '', '', '', '---', `Místo: ${title}`, `Souřadnice: ${lat.toFixed(5)}, ${lon.toFixed(5)}`, `Odkaz na pohled: ${location.href}`].join('\n');
+      return `https://github.com/frenkees/hradeczive/issues/new?title=${encodeURIComponent('Mapa: ' + title)}&body=${encodeURIComponent(body)}`;
+    };
+    rb.href = issueUrl(); rb.addEventListener('click', () => { rb.href = issueUrl(); });
+    links.append(rb);
     $('card').style.transform = '';
     $('card').hidden = false;
     for (const p of PLUGINS) if (p.card) try { p.card({ title, lon, lat, el: $('cardExtra') }); } catch (e) { console.warn(e); }

@@ -81,6 +81,7 @@ npm run nahled                      # náhled na http://localhost:8000
 | 4 roční období, noc, déšť, sníh, mlha | |
 | auta, MHD podle jízdních řádů (GTFS), lyžaři, chodci | |
 | klikací budovy s adresou, hledání, názvy částí obce | |
+| | vánoční výzdoba: strom, kluziště, stánky, zapnutá podle data (`assets/vanoce.json`, `./vanoce.sh`) |
 | | hlášení nepřesností od lidí s administrací (volitelný server, `hlaseni/`) |
 
 **Mosty a lávky** jsou skutečné 3D mostovky: nad silnicí nebo tratí mají podjezdnou výšku a nájezdy na ně vedou
@@ -143,6 +144,7 @@ nastroje/       les.py (ortofoto, maska lesa), zabaged.py (pole, louky), pole.py
 prep.py         data -> scéna čtverce (budovy, stromy, textury terénu podle ročního období)
 render.html     renderer (three.js), render.mjs ho pouští po dlaždicích v Chromiu
 dzi.py          dlaždice -> Deep Zoom pyramidy (WebP) do site/tiles/
+vanoce.sh       vánoční výzdoba jako průhledná vrstva (jen čtverce s výzdobou)
 overlay.py      klikací vrstva: obrysy budov, adresy, ulice, místa, doprava
 mhd.py          jízdní řády GTFS -> site/mhd.json (krajské GTFS ořízne na mapu)
 road_route.py   trasy autobusů po silnicích pro GTFS bez shapes.txt (např. IDS JMK)

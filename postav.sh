@@ -20,6 +20,7 @@ fi
 if [ "$1" != render ]; then rm -rf site/tiles site/tiles.json; fi   # celá stavba kreslí vše znovu; ./postav.sh render kreslí jen změněné čtverce
 mkdir -p site/tiles
 ./render_par.sh                                               # scény, render a dlaždice: několik čtverců najednou podle paměti (./render_par.sh 1 = po jednom)
+./vanoce.sh > /dev/null                                       # vánoční výzdoba jako průhledná vrstva (jen s assets/vanoce.json)
 for s in summer autumn winter spring; do node render.mjs mpp=0.2 dir=build season=$s alpha=1 stromy=site/stromy > /dev/null; done   # kresby stromů: auta se schovají přesně za ně
 python preview.py
 python overlay.py

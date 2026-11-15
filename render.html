@@ -14,6 +14,9 @@ const TILE = parseInt(PARAMS.tile || '1024');
 const SEASON = PARAMS.season || 'autumn';
 const SEASON_ID = { spring: 0, summer: 1, autumn: 2, winter: 3 }[SEASON];
 const LIGHTS = PARAMS.mode === 'lights';
+// samostatná průhledná vrstva 'xmas' = vánoční výzdoba (assets/vanoce.json), prohlížeč ji zapíná podle data.
+// Ostatní scéna se v ní kreslí jen do hloubky (zakrývá), barvu nezapisuje.
+const XMAS = PARAMS.mode === 'xmas';
 const PAD = 4;
 const DIR = PARAMS.dir || 'build';
 const ALPHA = PARAMS.alpha === '1';            // průhledné pozadí (čtverce se skládají přes sebe)
@@ -336,7 +339,7 @@ const roofMat = mat(/* glsl */`
     gl_FragColor = vec4(shade(col, n, vW), 1.0);
   }`, {}, THREE.DoubleSide);
 // obecný materiál pro mobiliář, auta, komíny...  aw.x = svítí, aw.y = nebarvit instancí, aw.z = v zimě sníh nahoře
-const solidMat = mat(/* glsl */`
+const SOLID_FRAG = /* glsl */`
   varying vec3 vC; varying vec3 vN; varying vec3 vW; varying vec4 vA;
   void main(){
     if (uLights > 0.5) { gl_FragColor = vec4(vA.x > 0.5 ? (vA.w > 0.5 ? vC * (0.5 + 0.6 * vA.x) : vec3(1.0, 0.86, 0.6) * vA.x) : vec3(0.0), 1.0); return; }   // aw.w = svítí vlastní barvou (cedule)
@@ -344,7 +347,9 @@ const solidMat = mat(/* glsl */`
     vec3 col = vC;
     if (winter() && vA.z > 0.5 && n.y > 0.6) col = SNOW;
     gl_FragColor = vec4(shade(col, n, vW), 1.0);
-  }`, {}, THREE.DoubleSide);
+  }`;
+const solidMat = mat(SOLID_FRAG, {}, THREE.DoubleSide);
+const ovMat = mat(SOLID_FRAG, {}, THREE.DoubleSide);      // vlastní materiál vrstvy xmas (ostatní materiály se v ní kreslí jen do hloubky)
 
 // ---------- budovy ----------
 function pointInPoly(x, y, P) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
@@ -1180,6 +1185,56 @@ const RAIL_DECKS = [];   // osy kolejí na mostovkách [[x, y, z], ...] (plní m
     for (const [x, y, z, a, t] of scene.play || []) if (M[t]) M[t](frameAt(x, y, z, a));
     if (PL.p.length) world.add(new THREE.Mesh(geom(PL), solidMat));
   }
+  // vánoční výzdoba (assets/vanoce.json): jen ve vrstvě mode=xmas (zimní varianta se sněhem, podzimní bez);
+  // blikající světýlka, bruslaře a noční osvětlení kreslí prohlížeč (web/app.html)
+  if (XMAS) {
+    const ROOF = SEASON_ID === 3 ? [0.93, 0.95, 0.97] : [0.52, 0.20, 0.15];
+    const V = newBuf(), W0 = [0, 1, 0, 0];
+    for (const [x, y, g] of scene.xmas || []) {
+      const f = frameAt(x, y, g, 0);
+      pushBox(V, f, -0.3, 0.3, -0.3, 0.3, -0.3, 1.6, [0.36, 0.24, 0.16], W0);
+      const greens = [[0.10, 0.27, 0.16], [0.12, 0.31, 0.18], [0.11, 0.29, 0.17]];
+      for (let i = 0; i < 6; i++) {                 // patra jehličí: osmiboké kužely, každý menší a výš
+        const z0 = 1.2 + i * 1.75, z1 = z0 + 3.0, r = 3.7 - i * 0.56, n = 8, top = f(0, 0, z1);
+        for (let k = 0; k < n; k++) {
+          const a0 = (k / n) * 2 * Math.PI + i * 0.2, a1 = ((k + 1) / n) * 2 * Math.PI + i * 0.2;
+          pushTri(V, f(Math.cos(a0) * r, Math.sin(a0) * r, z0), f(Math.cos(a1) * r, Math.sin(a1) * r, z0), top, greens[(i + k) % 3], W0);
+        }
+        for (let k = 0; k < 4; k++) {               // ozdoby: červené a zlaté koule na spodním okraji patra
+          const a = (k / 4) * 2 * Math.PI + i * 0.9, rr = r * 0.82, s = Math.cos(a) * rr, t = Math.sin(a) * rr, zz = z0 + 0.35;
+          pushBox(V, f, s - 0.2, s + 0.2, t - 0.2, t + 0.2, zz - 0.2, zz + 0.2, (i + k) % 2 ? [0.80, 0.16, 0.14] : [0.93, 0.74, 0.22], W0);
+        }
+      }
+      pushBox(V, f, -0.35, 0.35, -0.35, 0.35, 13.9, 14.7, [1.0, 0.86, 0.30], W0);     // hvězda na špičce
+    }
+    for (const [x, y, z0, z1, a, Lr, Wr] of scene.rinks || []) {
+      const f = frameAt(x, y, 0, a), ice = z1 + 0.12, l = Lr / 2, w = Wr / 2, T = 0.15;
+      pushBox(V, f, -l, l, -w, w, z0 - 0.4, ice, [0.82, 0.92, 0.97], W0);          // led
+      const white = [0.95, 0.95, 0.94], blue = [0.24, 0.50, 0.76];               // mantinel s modrou horní hranou
+      pushBox(V, f, -l - T, l + T, -w - T, -w, z0 - 0.4, ice + 1.0, white, W0, blue);
+      pushBox(V, f, -l - T, l + T, w, w + T, z0 - 0.4, ice + 1.0, white, W0, blue);
+      pushBox(V, f, -l - T, -l, -w, w, z0 - 0.4, ice + 1.0, white, W0, blue);
+      pushBox(V, f, l, l + T, -w, w, z0 - 0.4, ice + 1.0, white, W0, blue);
+    }
+    // vánoční stánky: dřevěná bouda, zasněžená sedlová střecha, otevřený pult na straně −t, světýlka pod okapem
+    for (const [x, y, g, a, wS, i] of scene.stalls || []) {
+      const f = frameAt(x, y, g, a), l = wS / 2, w = 1.2, E = 2.2, Rg = 3.0, o = 0.3;
+      const wood = i % 2 ? [0.50, 0.33, 0.19] : [0.44, 0.28, 0.16], snow = ROOF;
+      pushBox(V, f, -l, l, -w, w, -0.3, E, wood, W0);
+      pushTri(V, f(l, -w, E), f(l, w, E), f(l, 0, Rg), wood, W0);                        // štíty
+      pushTri(V, f(-l, w, E), f(-l, -w, E), f(-l, 0, Rg), wood, W0);
+      const L = l + 0.15, e = E - 0.12;
+      pushQuad(V, f(-L, -w - o, e), f(L, -w - o, e), f(L, 0, Rg + 0.1), f(-L, 0, Rg + 0.1), snow, W0);   // střecha se sněhem
+      pushQuad(V, f(L, w + o, e), f(-L, w + o, e), f(-L, 0, Rg + 0.1), f(L, 0, Rg + 0.1), snow, W0);
+      pushBox(V, f, -l + 0.25, l - 0.25, -w - 0.02, -w + 0.1, 0.95, 1.95, [0.98, 0.78, 0.42], W0);        // osvětlené okno pultu
+      pushBox(V, f, -l + 0.15, l - 0.15, -w - 0.35, -w, 0.85, 0.95, [0.62, 0.43, 0.25], W0);              // pult
+      for (let k = 0; k < 6; k++) {                                                                   // světýlka
+        const s = -l + 0.25 + k * (wS - 0.5) / 5;
+        pushBox(V, f, s - 0.07, s + 0.07, -w - o + 0.05, -w - o + 0.19, e - 0.22, e - 0.08, k % 2 ? [1.0, 0.85, 0.35] : [0.90, 0.20, 0.16], W0);
+      }
+    }
+    if (V.p.length) { const m = new THREE.Mesh(geom(V), ovMat); m.userData.ov = true; world.add(m); }
+  }
   // lana lanovek a vleků – tenké tmavé čáry (elektrické vedení se nekreslí)
   const wires = [];
   for (const pl of scene.lines.lift || []) for (let i = 0; i < pl.length - 1; i++) {          // jen lanovky a vleky
@@ -1651,7 +1706,23 @@ const post = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMater
 const postScene = new THREE.Scene(); postScene.add(post);
 const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-window.INFO = { width: IW, height: IH, tile: TILE, cols: Math.ceil(IW / TILE), rows: Math.ceil(IH / TILE), x0: GX0, y1: GY1, mpp: MPP, chunk: scene.chunk || [0, 0], season: SEASON, mode: LIGHTS ? 'lights' : 'day' };
+// vrstva xmas: všechno ostatní jen do hloubky; renderují se jen dlaždice, kde výzdoba něco má
+let NEED = null;
+if (XMAS) {
+  world.traverse((o) => { if (o.material && !o.userData.ov) for (const m of [].concat(o.material)) m.colorWrite = false; });
+  NEED = new Set();
+  const mark = (x, y, h, r) => {
+    for (const [dx, dy] of [[-r, -r], [r, -r], [r, r], [-r, r]]) for (const dh of [-1, h]) {
+      const v = new THREE.Vector3(x + dx, dh, -(y + dy)).applyMatrix4(inv);
+      const px = (v.x - X0) / MPP, py = (Y1 - v.y) / MPP;
+      for (const ox of [-8, 8]) for (const oy of [-8, 8]) NEED.add(`${Math.floor((px + ox) / TILE)}_${Math.floor((py + oy) / TILE)}`);
+    }
+  };
+  for (const [x, y, g] of scene.xmas || []) mark(x, y, g + 16, 5);
+  for (const [x, y, z0, z1, a, L, W] of scene.rinks || []) mark(x, y, z1 + 2, Math.max(L, W) / 2 + 1);
+  for (const [x, y, g] of scene.stalls || []) mark(x, y, g + 4, 3);
+}
+window.INFO = { width: IW, height: IH, tile: TILE, cols: Math.ceil(IW / TILE), rows: Math.ceil(IH / TILE), x0: GX0, y1: GY1, mpp: MPP, chunk: scene.chunk || [0, 0], season: SEASON, mode: XMAS ? 'xmas' : LIGHTS ? 'lights' : 'day', need: NEED ? [...NEED] : null };
 const out = document.createElement('canvas'); out.width = TILE; out.height = TILE;
 const octx = out.getContext('2d');
 window.renderTile = (i, j) => {

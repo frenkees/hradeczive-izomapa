@@ -83,6 +83,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
     mhd = M.get('mhd') or {}
     pohled = M.get('pohled')
     strom = M.get('vanocni_strom')
+    if isinstance(strom, list) and strom and isinstance(strom[0], list): strom = strom[0]      # víc stromů: náhled podle prvního
     fill = {
         'TITULEK': E(M['titulek']), 'POPIS': E(M['popis']), 'MESTO': E(M['nazev']), 'H1_A': E(M['h1'][0]), 'H1_B': E(M['h1'][1]),
         'PODTITUL': E(M['podtitul']),
@@ -94,6 +95,10 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'POHLED': json.dumps(pohled if isinstance(pohled, list) and len(pohled) >= 2 else None),
         'DOMU_CELEK': 'true' if M.get('domu_celek') else 'false',
         'STROM': json.dumps(strom if isinstance(strom, list) and len(strom) == 2 else None),
+        'XMAS_LL': json.dumps((lambda v: v if v and isinstance(v[0], list) else [v] if v else [])(M.get('vanocni_strom'))),   # vánoční stromy [[lat, lon], ...]
+        'KLUZISTE': json.dumps(M.get('kluziste') or []),
+        'STANKY': json.dumps(M.get('vanocni_stanky') or []),
+        'VANOCE': json.dumps(M.get('vanoce') or None),                 # termín vánoční vrstvy {"od": "11-11", "do": "01-06"} (assets/vanoce.json)
         'OBEC': json.dumps(M.get('nazev') if je_obec else None, ensure_ascii=False),
         'VLAK': json.dumps({'vychozi': (M.get('vlak') or {}).get('vychozi', 'regionova') if isinstance(M.get('vlak'), dict) else M.get('vlak', 'regionova'), 'linky': M['vlak'].get('linky', {}) if isinstance(M.get('vlak'), dict) else {}}),
         'MHD_BARVY': json.dumps(mhd.get('barvy') or None),

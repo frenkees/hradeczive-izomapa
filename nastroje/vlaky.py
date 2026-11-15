@@ -218,6 +218,32 @@ for t in v:
         if body[i][4]: zs += [norm(body[i][0]) + (f' (kolej {body[i][5]})' if len(body[i]) > 5 else ''), round(body[i][2] - t0)]
     trips.append([len(routes) - 1, SI[klic], sluzba(t['bitmap'], t['od']), round(t0), sq, norm(cil), zs])
     stat['ok'] += 1
+# ---- nákladní vlaky: náhodné průjezdy po tratích přes HK hl.n. (uhlí, autovlaky ze Škodovky, kontejnery, cisterny, dřevo) ----
+# Nejsou v jízdním řádu osobních vlaků; každý jede jen v náhodné polovině dnů (služba = množina přidaných dní), rychlostí 40–60 km/h
+if KOL:
+    import random
+    rng = random.Random(20261115)
+    def _prochazi(sh_):                                          # trasa vede po hlavní koleji u nástupiště a HK hl.n. je uvnitř trasy (ne na jejím konci)
+        l_ = shapely.LineString(sh_)
+        for k in ('1', '2'):
+            p_ = shapely.Point(*KOL['koleje'][k]['stop'])
+            if l_.distance(p_) < 8 and 1200 < l_.project(p_) < l_.length - 1200: return True
+        return False
+    pruchozi = [i for i, sh_ in enumerate(shapes) if _prochazi(sh_)]
+    print('tras pro nákladní vlaky', len(pruchozi))
+    NAKL = [('f_uhli', 'uhlí', 30), ('f_kont', 'kontejnery', 25), ('f_auta', 'automobily Škoda', 15), ('f_cist', 'cisterny', 15), ('f_drevo', 'dřevo', 15)]
+    zacatek = datetime.date.today()
+    if pruchozi:
+        for n in range(22):
+            model, nazev, _ = rng.choices(NAKL, weights=[q[2] for q in NAKL])[0]
+            si = rng.choice(pruchozi); L = shapely.LineString(shapes[si]).length
+            v_ = rng.uniform(11.0, 16.5); T = L / v_
+            dny = [int((zacatek + datetime.timedelta(days=i)).strftime('%Y%m%d')) for i in range(76) if rng.random() < 0.45]
+            sid = f'N{n}'; services[sid] = [[0] * 7, int(zacatek.strftime('%Y%m%d')), int((zacatek + datetime.timedelta(days=75)).strftime('%Y%m%d')), dny, []]
+            routes.append([f'Pn {51000 + n * 37}', 2, '#8a3a2a', 3, model])
+            t0 = rng.randrange(0, 86400)
+            trips.append([len(routes) - 1, si, sid, t0, [0, 0, round(T), round(L)], f'Nákladní vlak ({nazev})', [f'Nákladní vlak ({nazev})', 0]])
+        stat['nákladní'] = 22
 json.dump({'routes': routes, 'shapes': shapes, 'services': services, 'trips': trips}, open('build/vlaky/vlaky_mhd.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 print(dict(stat)); print('tras', len(shapes), 'služeb', len(services), 'kB', os.path.getsize('build/vlaky/vlaky_mhd.json') // 1000)
 print('neznámé zastávky', nezn.most_common(40))

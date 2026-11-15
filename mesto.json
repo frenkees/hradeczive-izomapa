@@ -112,5 +112,9 @@
       "text": "zdrojový kód této mapy (AGPL-3.0, upravená izomapa Adama Klatovského)",
       "url": "https://github.com/frenkees/hradeczive-izomapa"
     }
-  ]
+  ],
+  "vlak": {
+    "vychozi": "regionova",
+    "linky": {}
+  }
 }

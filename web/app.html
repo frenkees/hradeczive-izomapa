@@ -1179,13 +1179,14 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   function updateXings() {
     if (!XC.size) return;
     const trains = MHD.on ? MHD.act.filter(([i]) => MHD.routes[MHD.trips[i][0]][1] === 2) : [];
+    const setClosed = (c, v) => { if (c.closed !== v) { c.closed = v; c.tchg = performance.now(); } };   // čas změny: závory se spouštějí až po zahájení výstrahy a zvedají po průjezdu
     for (const c of XC.values()) {
-      if (!trains.length) { c.closed = false; continue; }
+      if (!trains.length) { setClosed(c, false); continue; }
       if (!c.on) xingShapes(c);
-      c.closed = trains.some(([i, el]) => {
+      setClosed(c, trains.some(([i, el]) => {
         const trip = MHD.trips[i], T = TRAINS[trainOf(MHD.routes[trip[0]][0])].cars.reduce((a, q) => a + q.len + 0.4, 0);
         return c.on.some(([sh, s]) => sh === trip[1] && trainS(trip, el + 25) + T / 2 > s - 5 && trainS(trip, el) - T / 2 < s + 8);
-      });
+      }));
     }
   }
   const ek = (p) => Math.round(p[0]) + ',' + Math.round(p[1]);
@@ -1297,6 +1298,21 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     ctx.fillStyle = lamp[1]; ctx.fillRect(lamp[0] - q * 0.6, y - h + q * 0.05, q * 1.2, q * 1.1);
   }
+  // závora (půlzávora na straně příjezdu): rameno se otáčí kolem sloupku, 0° = vodorovně přes vozovku (zavřeno), 85° = svisle (otevřeno);
+  // spouští se 6 s po začátku výstrahy (4 s), zvedá se hned po průjezdu (4 s); červenobílé pruhy a červené světlo na konci
+  function drawXArm(o, z, sx, ox, oy, now, night) {
+    const c = z.xc, c0 = o.c0; if (!c0) return;
+    const t = performance.now() - (c.tchg ?? -1e9);
+    const ang = c.closed ? 85 * (1 - Math.min(1, Math.max(0, (t - 6000) / 4000))) : 85 * Math.min(1, t / 4000);
+    if (ang >= 84.5) return;                                   // zvednutá závora se nekreslí (u sloupku jen stojan)
+    const a = ang * Math.PI / 180, hz = 1.1, L = Math.hypot(c0.x - o.x, c0.y - o.y) + 0.4;
+    const pt = (f) => { const x = o.x + (c0.x - o.x) * f * Math.cos(a), y = o.y + (c0.y - o.y) * f * Math.cos(a), hh = (o.z ?? gz(o.x, o.y)) + hz + L * f * Math.sin(a), [ix, iy] = toImg(x, y, hh); return [ox + ix * sx, oy + iy * sx]; };
+    const w = Math.max(1.5, 1.6 * sx), N = 6; let prev = pt(0);
+    for (let k = 1; k <= N; k++) {
+      const cur = pt(k / N); ctx.strokeStyle = k % 2 ? '#d8382c' : '#f2f2ee'; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(cur[0], cur[1]); ctx.stroke(); prev = cur;
+    }
+    if (c.closed && Math.floor(now / 500) % 2) { ctx.fillStyle = '#ff4438'; ctx.fillRect(prev[0] - w, prev[1] - w * 1.5, w * 2, w * 2); }
+  }
   const curbPt = (o, side, off) => {                       // bod u pravého okraje vozovky pro auta jedoucí po kusu (side 1) nebo proti (-1)
     const L = Math.hypot(o.dx, o.dy) || 1, x = o.x + o.dy / L * side * off, y = o.y - o.dx / L * side * off, h = o.z ?? gz(x, y), [ix, iy] = toImg(x, y, h);
     return { x, y, ix, iy, d: depth(x, y, h) };
@@ -1368,7 +1384,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     m.dur = m.trips.map((t) => t[4][t[4].length - 2]);
     m.maxDur = Math.max(...m.dur);
     m.maxWait = m.trips.reduce((x, t) => Math.max(x, t[7] || 0), 0);   // čekání na konečné před odjezdem (mhd.py)
-    Object.assign(MHD, m, { on: true });
+    Object.assign(MHD, m, { on: true }); MHD.tm = new Map((m.routes || []).filter((r) => r[1] === 2 && r[4]).map((r) => [r[0], r[4]]));
     stopsReady();
   }).catch(() => {});
   const pragueNow = () => {                                // datum, den v týdnu (po = 0) a sekundy od půlnoci (čas v Česku)
@@ -1608,18 +1624,24 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   // vlaky: délky článků podle skutečných řad (Wikipedie), barvy podle jednotného schématu ČD; výška a čela jsou přibližné.
   // f / r = čelo vpředu / vzadu; deck 2 = patrový; loco = bez bočních oken. Výběr: "vlak" v mesto.json.
   const CD = { low: [18, 63, 115], body: [31, 106, 176], band: [232, 240, 246], roof: [120, 128, 136] };
+  const ARR = { low: [0, 92, 102], body: [0, 158, 168], band: [236, 242, 242], roof: [128, 140, 144] };
   const CDW = { low: [31, 95, 168], body: [236, 240, 242], band: [31, 95, 168], roof: [150, 156, 162] };
   const TRAINS = {
     regiopanter: { h: 4.2, ...CD, nose: 2.6, top: 'box', cars: [{ len: 26.2, f: 1 }, { len: 26.2, r: 1 }] },      // RegioPanter, 52,9 m
     regioshark: { h: 3.9, ...CD, nose: 2.2, top: 'box', cars: [{ len: 21.6, f: 1 }, { len: 21.6, r: 1 }] },       // řada 844, 43,73 m
     regionova: { h: 3.8, ...CD, nose: 1.2, top: 'box', cars: [{ len: 14, f: 1 }, { len: 14, r: 1 }] },            // řada 814, 28,44 m
     vuz810: { h: 3.7, ...CDW, nose: 0.7, cars: [{ len: 13.97, f: 1, r: 1 }] },                                    // řada 810, 13,97 m
+    os163: { h: 4.2, ...CD, nose: 1.4, cars: [{ len: 16.8, f: 1, loco: 1, top: 'panto' }, { len: 24.5 }, { len: 24.5 }, { len: 24.5, r: 1 }] },   // lokomotiva 163 a tři vozy
+    regioshark2: { h: 3.9, ...CD, nose: 2.2, top: 'box', cars: [{ len: 21.6, f: 1 }, { len: 21.6, r: 1 }, { len: 21.6, f: 1 }, { len: 21.6, r: 1 }] },   // dvě jednotky 844, 87,5 m
+    regionova2: { h: 3.8, ...CD, nose: 1.2, top: 'box', cars: [{ len: 14, f: 1 }, { len: 14, r: 1 }, { len: 14, f: 1 }, { len: 14, r: 1 }] },       // dvě jednotky 814, 57 m
+    rychlik4: { h: 4.1, ...CD, nose: 1.4, cars: [{ len: 18, f: 1, loco: 1, top: 'panto' }, { len: 26.4 }, { len: 26.4 }, { len: 26.4 }, { len: 26.4 }, { len: 26.4 }] },   // lokomotiva a pět vozů
+    flirt: { h: 4.2, ...ARR, nose: 2.4, top: 'box', cars: [{ len: 19.4, f: 1 }, { len: 19.4 }, { len: 19.4, r: 1 }] },                  // třídílná jednotka FLIRT, 58 m (Arriva)
     cityelefant: { h: 4.6, ...CDW, nose: 1.6, deck: 2, top: 'panto', cars: [{ len: 26.2, f: 1 }, { len: 26.2 }, { len: 26.2, r: 1 }] },   // řada 471, 79,2 m
     rychlik: { h: 4.1, ...CD, nose: 1.4, cars: [{ len: 18, f: 1, loco: 1, top: 'panto' }, { len: 26.4 }, { len: 26.4 }, { len: 26.4 }] },   // lokomotiva 380 (18 m) a vozy
   };
   const VLAK = {{VLAK}};
   const MHD_BARVY = {{MHD_BARVY}};
-  const trainOf = (line) => TRAINS[VLAK.linky[line]] ? VLAK.linky[line] : TRAINS[VLAK.vychozi] ? VLAK.vychozi : 'regionova';
+  const trainOf = (line) => { const k = MHD.tm && MHD.tm.get(line); return TRAINS[k] ? k : TRAINS[VLAK.linky[line]] ? VLAK.linky[line] : TRAINS[VLAK.vychozi] ? VLAK.vychozi : 'regionova'; };   // model z jízdního řádu (5. položka trasy), jinak podle mesto.json
   // col = "kabina|nástavba|druh" (druh: box = skříň, tarp = plachta)
   function truckFaces(ctx) {
     const { R, box, faces, fx_, fy_, sxv, syv, vis, sun, l, w, col, snow } = ctx;
@@ -2626,9 +2648,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         const dc = depth(z[1], z[2], gz(z[1], z[2]));
         for (const d of [-6, 6]) {                         // výstražník z obou stran koleje (když kus silnice pokračuje)
           if (z[0] + d < 0 || z[0] + d > r.L) continue;
-          const o = curbPt(along(r, z[0] + d), d < 0 ? 1 : -1, 4), dp = o.d;   // vpravo u okraje vozovky pro auta, která k přejezdu jedou
+          const c0 = along(r, z[0] + d), o = curbPt(c0, d < 0 ? 1 : -1, 4), dp = o.d; o.c0 = c0;   // vpravo u okraje vozovky pro auta, která k přejezdu jedou
           if (!vis(o.ix, o.iy) || occluded(o.ix, o.iy, dp) || occluded(o.ix, o.iy - 30, dp)) continue;   // za budovou (pata nebo výstražník) se nekreslí
-          if (dp < dc) xFront.push([o, z]); else drawXPost(o, z, sx, ox, oy, now, night);
+          if (dp < dc) xFront.push([o, z]); else { drawXPost(o, z, sx, ox, oy, now, night); drawXArm(o, z, sx, ox, oy, now, night); }
         }
       }
       if (sx > 0.12) for (const c of cars) {
@@ -2683,7 +2705,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         if (vis(o.ix, o.iy, 120)) drawVehicle(o, 15, 2.5, 't3', sx, ox, oy, night, 2);
       }
       flushLights(night, sx);
-      for (const [o, z] of xFront) drawXPost(o, z, sx, ox, oy, now, night);   // až po světlech aut, ať je kužel nepřekryje
+      for (const [o, z] of xFront) { drawXPost(o, z, sx, ox, oy, now, night); drawXArm(o, z, sx, ox, oy, now, night); }   // až po světlech aut, ať je kužel nepřekryje
     }
     // lyžaři (jen v zimě)
     if (snowy && skiers.length) {

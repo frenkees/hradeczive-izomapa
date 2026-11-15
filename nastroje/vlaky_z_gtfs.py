@@ -65,8 +65,15 @@ def bitmap(sid):
         out += '1' if on else '0'
     return out
 
+import hashlib, math
+HL_N = 'Hradec Králové hlavní nádraží'
+_hk = next((st_pos[p] for p, n in st_name.items() if n == HL_N), None)
+def smer_gtfs(jmeno, sid):
+    if jmeno in ('Hradec Králové-Kukleny', 'Praskačka'): return 'OPL'
+    lo, la = st_pos[sid]; a = math.degrees(math.atan2((lo - _hk[0]) * 71500, (la - _hk[1]) * 110574)) % 360
+    return 'PNL' if a < 45 or a >= 355 else 'HSP' if a < 135 else 'ONL' if a < 215 else 'OPL' if a < 290 else 'VSE'
 out, kj, pouzite = [], collections.Counter(), set()
-for tid in dotyk:
+for tid in sorted(dotyk, key=int):
     t = trips[tid]; r = routes[t['route_id']]; pts = sorted(seq[tid])
     body = []
     for _, sid, a, d, pu, do in pts:
@@ -78,8 +85,18 @@ for tid in dotyk:
     bm = bitmap(t['service_id'])
     if '1' not in bm: continue
     dop = ag.get(r['agency_id'], '')
+    # model soupravy: dopravce, druh a směr (Pardubice je elektrifikované, ostatní motorové), variabilita podle čísla vlaku
+    h_ = int(hashlib.md5((r['route_short_name'] + (t.get('trip_short_name') or '') + t['trip_id']).encode()).hexdigest(), 16) % 100
+    if 'ARRIVA' in dop.upper(): model = 'flirt'
+    elif druh(r['route_short_name']) in ('157', '122', '63', '69', '50'):
+        model = 'rychlik4' if h_ < 45 else 'rychlik'
+    else:
+        konce = {smer_gtfs(q[0], q[1]) for q in (body[0], body[-1]) if q[0] != HL_N}
+        if 'ONL' in konce: model = 'regiopanter' if h_ < 55 else 'cityelefant' if h_ < 80 else 'os163'
+        elif 'PNL' in konce or 'HSP' in konce: model = 'regioshark' if h_ < 40 else 'regioshark2' if h_ < 55 else 'regionova' if h_ < 80 else 'regionova2' if h_ < 90 else 'vuz810'
+        else: model = 'regionova' if h_ < 35 else 'regioshark' if h_ < 65 else 'regiopanter' if h_ < 85 else 'regionova2'
     out.append({'cislo': r['route_short_name'] + ' ' + (t.get('trip_short_name') or t['trip_id']), 'druh': druh(r['route_short_name']), 'typ': '11', 'dop': dop_kod(dop),
-                'bitmap': bm, 'od': dnes.isoformat() + 'T00:00:00', 'do': dny[-1].isoformat() + 'T00:00:00', 'body': body, 'dopravce': dop, 'headsign': t['trip_headsign']})
+                'model': model, 'bitmap': bm, 'od': dnes.isoformat() + 'T00:00:00', 'do': dny[-1].isoformat() + 'T00:00:00', 'body': body, 'dopravce': dop, 'headsign': t['trip_headsign']})
     kj[(druh(r['route_short_name']), dop)] += 1
 # ---- kolej ve stanici HK hl.n.: pravidla z GVD (směr příjezdu a odjezdu), bez kolizí na téže koleji ve stejný čas ----
 import math

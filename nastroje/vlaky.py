@@ -51,9 +51,11 @@ def nid(p):
     k = (round(p[0] * 2), round(p[1] * 2))
     if k not in ids: ids[k] = len(xy); xy.append(p)
     return ids[k]
+RAILS = []
 for r in rows:
     if r['subtype'] != 'rail' or r['class'] not in ('standard_gauge', 'unknown'): continue
     g = shapely.transform(shapely.from_wkb(r['geometry']), lambda c: np.column_stack(to_local(c[:, 0], c[:, 1])))
+    RAILS.append(g)
     c = shapely.get_coordinates(shapely.segmentize(g, 10.0))
     for a, b in zip(c[:-1], c[1:]):
         ia, ib = nid((float(a[0]), float(a[1]))), nid((float(b[0]), float(b[1])))
@@ -79,11 +81,30 @@ def od(a):
 def uzel(p, r=170.0):
     d, i = T.query(p)
     return int(i) if d <= r else None
+RTREE = shapely.STRtree(RAILS)
+def uzel_levy(p, smer):
+    """stanice na dvoukolejce / s předjížděcí kolejí: vlak jede po levé koleji ve směru jízdy (jako v HK hl.n. podle GVD); jedna kolej = nejbližší uzel"""
+    P = shapely.Point(*p); n = np.hypot(*smer)
+    if n < 1e-6: return uzel(p)
+    d = np.array(smer) / n; kand = []
+    for k in RTREE.query(P.buffer(25)):
+        g = RAILS[int(k)]; s_ = g.project(P); q = g.interpolate(s_)
+        if q.distance(P) > 25: continue
+        a1, a2 = g.interpolate(max(0.0, s_ - 6)), g.interpolate(min(g.length, s_ + 6))
+        t = np.array([a2.x - a1.x, a2.y - a1.y]); tn = np.hypot(*t)
+        if tn < 1e-6 or abs(float(t @ d)) / tn < 0.9: continue          # jen koleje rovnoběžné se směrem jízdy
+        kand.append((float(d[0] * (q.y - P.y) - d[1] * (q.x - P.x)), q))   # >0 = vlevo od směru jízdy
+    if len(kand) < 2: return uzel(p)
+    kand.sort(key=lambda a: a[0])
+    if kand[-1][0] - kand[0][0] < 3.0: return uzel(p)
+    q = kand[-1][1]
+    return uzel((q.x, q.y), 8.0)
 KOL = json.load(open('assets/vlaky_koleje.json', encoding='utf-8')) if os.path.exists('assets/vlaky_koleje.json') else None
-def uzel_stan(q, p):
+def uzel_stan(q, p, smer=None):
     """uzel zastavení: v HK hl.n. přiřazená kolej (q[5]) u nástupiště, jinak nejbližší uzel ke stanici"""
     if KOL and len(q) > 5 and q[0] == 'Hradec Králové hlavní nádraží' and q[5] in KOL['koleje']:
         return uzel(KOL['koleje'][q[5]]['stop'], 8.0)
+    if smer is not None: return uzel_levy(p, smer)
     return uzel(p)
 def cesta(a, b):
     dist, pred = od(a)
@@ -127,11 +148,16 @@ for t in v:
     if not na: stat['bez stanice na mapě'] += 1; continue
     k0, k1 = na[0], na[-1]
     usek = [pol[k] for k in range(k0, k1 + 1)]
+    POS = dict(pol)
+    def smer_(i, p):                                                # směr jízdy ve stanici: z předchozí do následující stanice (na konci aspoň z/do sousední)
+        a_ = POS.get(next((j for j in range(i - 1, -1, -1) if j in POS), -1)); b_ = POS.get(next((j for j in range(i + 1, len(body)) if j in POS), -1))
+        a_ = a_ or p; b_ = b_ or p
+        return (b_[0] - a_[0], b_[1] - a_[1])
     for (i, p) in usek:
-        if uzel_stan(body[i], p) is None: stat['bez kolejí: ' + str(body[i][0])] += 1
-    usek = [(i, p) for i, p in usek if uzel_stan(body[i], p) is not None]
+        if uzel_stan(body[i], p, smer_(i, p)) is None: stat['bez kolejí: ' + str(body[i][0])] += 1
+    usek = [(i, p) for i, p in usek if uzel_stan(body[i], p, smer_(i, p)) is not None]
     if not usek: stat['stanice mimo koleje'] += 1; continue
-    uzly = [uzel_stan(body[i], p) for i, p in usek]
+    uzly = [uzel_stan(body[i], p, smer_(i, p)) for i, p in usek]
     # průjezd po kolejích mezi stanicemi
     trasa = [uzly[0]]; delky = [0.0]; ok = True
     for a, b in zip(uzly[:-1], uzly[1:]):
@@ -183,7 +209,7 @@ for t in v:
         SI[klic] = len(shapes)
         shapes.append([[round(a, 1), round(b, 1)] for a, b in shapely.simplify(l, 0.8).coords])
     dr = DRUH.get(t['druh'], 'Os')
-    routes.append([f"{dr} {t['cislo']}", 2, BARVA.get(t['dop'], '#2a5ba8'), VOZU.get(dr, 3)])
+    routes.append([f"{dr} {t['cislo']}", 2, BARVA.get(t['dop'], '#2a5ba8'), VOZU.get(dr, 3), t.get('model') or ''])
     sq = []
     for a, d in seq: sq += [round(a - t0), round(d)]
     cil = next((q[0] for q in reversed(body) if q[4]), body[-1][0]) or ''

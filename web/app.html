@@ -505,13 +505,14 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   };
   let xmasUser = null;                                         // ruční přepnutí v menu (jen v tomto prohlížeči)
   const xmasOn = () => !!VANOCE && (xmasUser ?? inXmasDates());
+  const xmasShow = () => xmasOn() && (state.season === 'winter' || state.season === 'autumn');   // ručně zvolené jaro nebo léto výzdobu nemá
   function applyExtras() {
     if (!ready && !LAYERS.some((l) => l.day)) return;
     $('l-xmas').checked = xmasOn();
     $('l-xmas').closest('label').hidden = !VANOCE;
     const want = (l) => {
       const w = {};
-      if (xmasOn()) { const v = state.season === 'winter' ? 'xmas_winter' : 'xmas_autumn'; if (l.src(v)) w.xmas = v; }
+      if (xmasShow()) { const v = state.season === 'winter' ? 'xmas_winter' : 'xmas_autumn'; if (l.src(v)) w.xmas = v; }
       return w;
     };
     for (const l of LAYERS) {
@@ -3240,7 +3241,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
     }
     // kluziště: led s mantinelem je ve vrstvě výzdoby, tady jen bruslaři krouží po elipsách
-    const xm = xmasOn();
+    const xm = xmasShow();
     if (xm && sx > 0.25) for (const R of rinks) {
       const c0 = toImg(...R.at(0, 0), R.h); if (!vis(c0[0], c0[1], 60 * sx + 300)) continue;
       for (const q of R.sk.map((q) => [q, q.ph + t * q.v]).sort((m, n) => Math.sin(n[1]) - Math.sin(m[1]))) {

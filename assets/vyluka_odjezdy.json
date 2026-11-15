@@ -1,0 +1,475 @@
+{
+ "zdroj": "https://www.cd.cz/jizdni-rad/tratove-jizdni-rady/files/cz-k031-2026vyluka08.pdf",
+ "platnost": {
+  "od": "2026-11-01",
+  "do": "2026-12-12"
+ },
+ "usek": "Hradec Kralove hl.n. - Jaromer (NAD, nepretrzita vyluka trate 031)",
+ "zastavka_odjezd_HK": "Hradec Kralove hl.n. zastavka MHD \"F\"",
+ "zastavka_prijezd_HK": "Hradec Kralove hl.n. zastavka MHD \"J\"",
+ "poznamka": "Odjezdy z HK prepsane z PDF (casy z textu, linky a dny z vizualni kontroly). dny: denne = bez znacky, pracovni dny = znacka kladivek, so+ne = znacka 25. Spoje 4xxxxx (R) jsou neevidovane (B) a nejsou v informacnich systemech SZ. Smer Jaromer-HK neni v souboru.",
+ "hk_do_jaromere": [
+  {
+   "spoj": "5240",
+   "linka": "Z",
+   "odjezd": "00:00",
+   "prijezd_jaromer": "00:35",
+   "dny": "so+ne"
+  },
+  {
+   "spoj": "6200",
+   "linka": "Z",
+   "odjezd": "05:00",
+   "prijezd_jaromer": "05:35",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "939",
+   "linka": "R",
+   "odjezd": "05:50",
+   "prijezd_jaromer": "06:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "300939",
+   "linka": "J",
+   "odjezd": "06:05",
+   "prijezd_jaromer": "06:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "6202",
+   "linka": "Z",
+   "odjezd": "06:35",
+   "prijezd_jaromer": "07:10",
+   "dny": "denne"
+  },
+  {
+   "spoj": "406202",
+   "linka": "R",
+   "odjezd": "06:35",
+   "prijezd_jaromer": "07:00",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1380",
+   "linka": "R",
+   "odjezd": "06:50",
+   "prijezd_jaromer": "07:15",
+   "dny": "so+ne"
+  },
+  {
+   "spoj": "5242",
+   "linka": "Z",
+   "odjezd": "07:00",
+   "prijezd_jaromer": "07:35",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "405242",
+   "linka": "R",
+   "odjezd": "07:05",
+   "prijezd_jaromer": "07:30",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "90921",
+   "linka": "R",
+   "odjezd": "07:50",
+   "prijezd_jaromer": "08:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301474",
+   "linka": "J",
+   "odjezd": "08:05",
+   "prijezd_jaromer": "08:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1474",
+   "linka": "Z",
+   "odjezd": "08:35",
+   "prijezd_jaromer": "09:10",
+   "dny": "denne"
+  },
+  {
+   "spoj": "401474",
+   "linka": "R",
+   "odjezd": "08:35",
+   "prijezd_jaromer": "09:00",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1382",
+   "linka": "R",
+   "odjezd": "08:50",
+   "prijezd_jaromer": "09:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301382",
+   "linka": "J",
+   "odjezd": "09:05",
+   "prijezd_jaromer": "09:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "90923",
+   "linka": "R",
+   "odjezd": "09:50",
+   "prijezd_jaromer": "10:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301476",
+   "linka": "J",
+   "odjezd": "10:05",
+   "prijezd_jaromer": "10:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1476",
+   "linka": "Z",
+   "odjezd": "10:35",
+   "prijezd_jaromer": "11:10",
+   "dny": "denne"
+  },
+  {
+   "spoj": "401476",
+   "linka": "R",
+   "odjezd": "10:35",
+   "prijezd_jaromer": "11:00",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1384",
+   "linka": "R",
+   "odjezd": "10:50",
+   "prijezd_jaromer": "11:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301384",
+   "linka": "J",
+   "odjezd": "11:05",
+   "prijezd_jaromer": "11:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "5244",
+   "linka": "Z",
+   "odjezd": "11:35",
+   "prijezd_jaromer": "12:10",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "405244",
+   "linka": "R",
+   "odjezd": "11:35",
+   "prijezd_jaromer": "12:00",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "90925",
+   "linka": "R",
+   "odjezd": "11:50",
+   "prijezd_jaromer": "12:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301478",
+   "linka": "J",
+   "odjezd": "12:05",
+   "prijezd_jaromer": "12:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1478",
+   "linka": "Z",
+   "odjezd": "12:35",
+   "prijezd_jaromer": "13:10",
+   "dny": "denne"
+  },
+  {
+   "spoj": "401478",
+   "linka": "R",
+   "odjezd": "12:35",
+   "prijezd_jaromer": "13:00",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1386",
+   "linka": "R",
+   "odjezd": "12:50",
+   "prijezd_jaromer": "13:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301386",
+   "linka": "J",
+   "odjezd": "13:05",
+   "prijezd_jaromer": "13:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "5246",
+   "linka": "Z",
+   "odjezd": "13:35",
+   "prijezd_jaromer": "14:10",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "405246",
+   "linka": "R",
+   "odjezd": "13:35",
+   "prijezd_jaromer": "14:00",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "90927",
+   "linka": "R",
+   "odjezd": "13:50",
+   "prijezd_jaromer": "14:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301480",
+   "linka": "J",
+   "odjezd": "14:05",
+   "prijezd_jaromer": "14:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "2002",
+   "linka": "R",
+   "odjezd": "14:15",
+   "prijezd_jaromer": "14:40",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "1480",
+   "linka": "Z",
+   "odjezd": "14:35",
+   "prijezd_jaromer": "15:10",
+   "dny": "denne"
+  },
+  {
+   "spoj": "401480",
+   "linka": "R",
+   "odjezd": "14:35",
+   "prijezd_jaromer": "15:00",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1388",
+   "linka": "R",
+   "odjezd": "14:50",
+   "prijezd_jaromer": "15:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301388",
+   "linka": "J",
+   "odjezd": "15:05",
+   "prijezd_jaromer": "15:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "6272",
+   "linka": "Z",
+   "odjezd": "15:35",
+   "prijezd_jaromer": "16:10",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "406272",
+   "linka": "R",
+   "odjezd": "15:35",
+   "prijezd_jaromer": "16:00",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "90929",
+   "linka": "R",
+   "odjezd": "15:50",
+   "prijezd_jaromer": "16:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301482",
+   "linka": "J",
+   "odjezd": "16:05",
+   "prijezd_jaromer": "16:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1482",
+   "linka": "Z",
+   "odjezd": "16:35",
+   "prijezd_jaromer": "17:10",
+   "dny": "denne"
+  },
+  {
+   "spoj": "401482",
+   "linka": "R",
+   "odjezd": "16:35",
+   "prijezd_jaromer": "17:00",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1390",
+   "linka": "R",
+   "odjezd": "16:50",
+   "prijezd_jaromer": "17:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301390",
+   "linka": "J",
+   "odjezd": "17:05",
+   "prijezd_jaromer": "17:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "6274",
+   "linka": "Z",
+   "odjezd": "17:35",
+   "prijezd_jaromer": "18:10",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "406274",
+   "linka": "R",
+   "odjezd": "17:35",
+   "prijezd_jaromer": "18:00",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "90931",
+   "linka": "R",
+   "odjezd": "17:50",
+   "prijezd_jaromer": "18:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301484",
+   "linka": "J",
+   "odjezd": "18:05",
+   "prijezd_jaromer": "18:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1484",
+   "linka": "Z",
+   "odjezd": "18:35",
+   "prijezd_jaromer": "19:10",
+   "dny": "denne"
+  },
+  {
+   "spoj": "401484",
+   "linka": "R",
+   "odjezd": "18:35",
+   "prijezd_jaromer": "19:00",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1392",
+   "linka": "R",
+   "odjezd": "18:50",
+   "prijezd_jaromer": "19:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301392",
+   "linka": "J",
+   "odjezd": "19:05",
+   "prijezd_jaromer": "19:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "6276",
+   "linka": "Z",
+   "odjezd": "19:35",
+   "prijezd_jaromer": "20:10",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "406276",
+   "linka": "R",
+   "odjezd": "19:35",
+   "prijezd_jaromer": "20:00",
+   "dny": "pracovni dny"
+  },
+  {
+   "spoj": "90933",
+   "linka": "R",
+   "odjezd": "19:50",
+   "prijezd_jaromer": "20:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "305248",
+   "linka": "J",
+   "odjezd": "20:05",
+   "prijezd_jaromer": "20:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "5248",
+   "linka": "Z",
+   "odjezd": "20:35",
+   "prijezd_jaromer": "21:10",
+   "dny": "denne"
+  },
+  {
+   "spoj": "405248",
+   "linka": "R",
+   "odjezd": "20:35",
+   "prijezd_jaromer": "21:00",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1394",
+   "linka": "R",
+   "odjezd": "20:50",
+   "prijezd_jaromer": "21:15",
+   "dny": "denne"
+  },
+  {
+   "spoj": "401394",
+   "linka": "J",
+   "odjezd": "21:05",
+   "prijezd_jaromer": "21:30",
+   "dny": "denne"
+  },
+  {
+   "spoj": "301396",
+   "linka": "Z",
+   "odjezd": "21:50",
+   "prijezd_jaromer": "22:20",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1396",
+   "linka": "R",
+   "odjezd": "22:00",
+   "prijezd_jaromer": "22:20",
+   "dny": "denne"
+  },
+  {
+   "spoj": "401396",
+   "linka": "J",
+   "odjezd": "22:05",
+   "prijezd_jaromer": "22:35",
+   "dny": "denne"
+  },
+  {
+   "spoj": "1488",
+   "linka": "Z",
+   "odjezd": "22:40",
+   "prijezd_jaromer": "23:15",
+   "dny": "denne"
+  }
+ ]
+}

@@ -21,7 +21,9 @@ if '--stahnout' in sys.argv or not os.path.exists(Z) or time.time() - os.path.ge
     subprocess.run(['curl', '-sL', '-m', '120', '-o', Z + '.tmp', URL], check=True)
     zipfile.ZipFile(Z + '.tmp').testzip(); os.replace(Z + '.tmp', Z)
 zf = zipfile.ZipFile(Z)
-T = lambda n: (csv.DictReader(io.TextIOWrapper(zf.open(n + '.txt'), encoding='utf-8-sig')))
+def T(n):                                                    # soubor z GTFS + doplněk build/gtfs_extra/<n>.txt (nastroje/vyluka_nad.py: náhradní doprava za výluku)
+    yield from csv.DictReader(io.TextIOWrapper(zf.open(n + '.txt'), encoding='utf-8-sig'))
+    if os.path.exists(f'build/gtfs_extra/{n}.txt'): yield from csv.DictReader(open(f'build/gtfs_extra/{n}.txt', encoding='utf-8-sig', newline=''))
 sec = lambda t: (lambda h, m, s: h * 3600 + m * 60 + s)(*map(int, t.split(':')))
 
 AREA = shapely.union_all([shapely.box(x - HALF, y - HALF, x + HALF, y + HALF) for x, y in map(chunk_center, CHUNKS)])

@@ -86,7 +86,8 @@
     "zdroj": "DPMHK (jízdní řády z CIS JŘ)",
     "zdroj_url": "https://portal.cisjr.cz/",
     "dopravce": [
-      "Dopravní podnik města Hradce Králové"
+      "Dopravní podnik města Hradce Králové",
+      "Náhradní autobusová doprava"
     ],
     "barvy": {
       "karoserie": "#2c2e33",

@@ -81,6 +81,47 @@ for tid in dotyk:
     out.append({'cislo': r['route_short_name'] + ' ' + (t.get('trip_short_name') or t['trip_id']), 'druh': druh(r['route_short_name']), 'typ': '11', 'dop': dop_kod(dop),
                 'bitmap': bm, 'od': dnes.isoformat() + 'T00:00:00', 'do': dny[-1].isoformat() + 'T00:00:00', 'body': body, 'dopravce': dop, 'headsign': t['trip_headsign']})
     kj[(druh(r['route_short_name']), dop)] += 1
+# ---- kolej ve stanici HK hl.n.: pravidla z GVD (směr příjezdu a odjezdu), bez kolizí na téže koleji ve stejný čas ----
+import math
+HL = 'Hradec Králové hlavní nádraží'
+KOL = json.load(open('assets/vlaky_koleje.json', encoding='utf-8')) if os.path.exists('assets/vlaky_koleje.json') else None
+if KOL:
+    hk = next((st_pos[p] for p, n in st_name.items() if n == HL), None)
+    def smer(jmeno, sid):
+        if jmeno in ('Hradec Králové-Kukleny', 'Praskačka'): return 'OPL'
+        lo, la = st_pos[sid]; a = math.degrees(math.atan2((lo - hk[0]) * 71500, (la - hk[1]) * 110574)) % 360
+        return 'PNL' if a < 45 or a >= 355 else 'HSP' if a < 135 else 'ONL' if a < 215 else 'OPL' if a < 290 else 'VSE'
+    sid_of = {n: p for p, n in st_name.items()}
+    prav = KOL['pravidla']; PORADI = ['1', '2', '5', '6', '8', '10', '12', '3', '3a']
+    obs = collections.defaultdict(list)                         # kolej -> [(bitmap jako int, od, do)]
+    def volna(k, bm, od_, do_):
+        return not any(b2 & bm and od_ < d2 + 90 and o2 < do_ + 90 for b2, o2, d2 in obs[k])
+    seznam = []
+    for v_ in out:
+        for i, q in enumerate(v_['body']):
+            if q[0] == HL: seznam.append((q[2], v_, i))
+    for ta, v_, i in sorted(seznam, key=lambda x: x[0]):
+        b_ = v_['body']; q = b_[i]
+        a_ = smer(b_[i - 1][0], b_[i - 1][1]) if i > 0 else 'V'; c_ = smer(b_[i + 1][0], b_[i + 1][1]) if i + 1 < len(b_) else 'V'
+        zast = q[4] == 1
+        if not zast:                                             # průjezd: hlavní koleje, na sever 2, na jih 1
+            kand = ['2', '1'] if a_ in ('ONL', 'OPL') else ['1', '2']
+        else:
+            kand = list(prav.get(a_ + '>' + c_, {}))
+            if len(kand) < 2:                                      # pravidlo chybí/je málo: sečíst pravidla se stejným příjezdem nebo odjezdem
+                cn = collections.Counter()
+                for kk, vv in prav.items():
+                    x, y = kk.split('>')
+                    if (x == a_ and a_ != 'V') or (y == c_ and c_ != 'V'):
+                        for k_, n_ in vv.items(): cn[k_] += n_
+                kand += [k_ for k_, _ in cn.most_common() if k_ not in kand]
+            kand += [k_ for k_ in PORADI if k_ not in kand]
+        kand = [k_ for k_ in kand if k_ in KOL['koleje']]
+        bm = int(v_['bitmap'][::-1], 2); od_, do_ = q[2], q[3] if q[3] >= q[2] else q[2]
+        kol = next((k_ for k_ in kand if volna(k_, bm, od_, do_)), kand[0])
+        obs[kol].append((bm, od_, do_)); q.append(kol)
+        v_.setdefault('kolej', {})[HL] = kol; v_['smery'] = a_ + '>' + c_
+    print('koleje v HK hl.n.:', collections.Counter(v_['kolej'][HL] for v_ in out if 'kolej' in v_).most_common())
 json.dump(out, open('build/vlaky/vlaky.json', 'w', encoding='utf-8'), ensure_ascii=False)
 # stanice (jméno -> [lon, lat]) – ze všech zastávek vlaků, pro vlaky.py (nahrazuje dotaz na Overture)
 json.dump({st_name[p]: list(st_pos[p]) for p in pouzite}, open('build/vlaky/stanice.json', 'w', encoding='utf-8'), ensure_ascii=False)

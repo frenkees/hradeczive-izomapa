@@ -60,7 +60,9 @@ for r in rows:
         if ia == ib: continue
         d = float(np.hypot(*(b - a))); I += [ia, ib]; J += [ib, ia]; W += [d, d]
 XY = np.array(xy); T = cKDTree(XY)
-for a, b in T.query_pairs(5.0):
+DEG = np.bincount(np.array(I), minlength=len(XY))
+for a, b in T.query_pairs(5.0):                              # spojit jen konce kolejí s okolím (výhybky, mezery v datech); souběžné koleje kvůli tomu nesmí splynout
+    if DEG[a] > 1 and DEG[b] > 1: continue
     d = float(np.hypot(*(XY[a] - XY[b]))) * 2 + 2; I += [a, b]; J += [b, a]; W += [d, d]
 G = csr_matrix((W, (I, J)), shape=(len(XY), len(XY)))
 stupen = np.bincount(np.array(I), minlength=len(XY))
@@ -77,6 +79,12 @@ def od(a):
 def uzel(p, r=170.0):
     d, i = T.query(p)
     return int(i) if d <= r else None
+KOL = json.load(open('assets/vlaky_koleje.json', encoding='utf-8')) if os.path.exists('assets/vlaky_koleje.json') else None
+def uzel_stan(q, p):
+    """uzel zastavení: v HK hl.n. přiřazená kolej (q[5]) u nástupiště, jinak nejbližší uzel ke stanici"""
+    if KOL and len(q) > 5 and q[0] == 'Hradec Králové hlavní nádraží' and q[5] in KOL['koleje']:
+        return uzel(KOL['koleje'][q[5]]['stop'], 8.0)
+    return uzel(p)
 def cesta(a, b):
     dist, pred = od(a)
     if not np.isfinite(dist[b]): return None, None
@@ -120,10 +128,10 @@ for t in v:
     k0, k1 = na[0], na[-1]
     usek = [pol[k] for k in range(k0, k1 + 1)]
     for (i, p) in usek:
-        if uzel(p) is None: stat['bez kolejí: ' + str(body[i][0])] += 1
-    usek = [(i, p) for i, p in usek if uzel(p) is not None]
+        if uzel_stan(body[i], p) is None: stat['bez kolejí: ' + str(body[i][0])] += 1
+    usek = [(i, p) for i, p in usek if uzel_stan(body[i], p) is not None]
     if not usek: stat['stanice mimo koleje'] += 1; continue
-    uzly = [uzel(p) for _, p in usek]
+    uzly = [uzel_stan(body[i], p) for i, p in usek]
     # průjezd po kolejích mezi stanicemi
     trasa = [uzly[0]]; delky = [0.0]; ok = True
     for a, b in zip(uzly[:-1], uzly[1:]):
@@ -181,7 +189,7 @@ for t in v:
     cil = next((q[0] for q in reversed(body) if q[4]), body[-1][0]) or ''
     zs = []
     for (i, p) in usek:
-        if body[i][4]: zs += [norm(body[i][0]), round(body[i][2] - t0)]
+        if body[i][4]: zs += [norm(body[i][0]) + (f' (kolej {body[i][5]})' if len(body[i]) > 5 else ''), round(body[i][2] - t0)]
     trips.append([len(routes) - 1, SI[klic], sluzba(t['bitmap'], t['od']), round(t0), sq, norm(cil), zs])
     stat['ok'] += 1
 json.dump({'routes': routes, 'shapes': shapes, 'services': services, 'trips': trips}, open('build/vlaky/vlaky_mhd.json', 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))

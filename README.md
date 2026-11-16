@@ -79,7 +79,7 @@ npm run nahled                      # náhled na http://localhost:8000
 | terén, voda, silnice, koleje, sjezdovky | |
 | mosty a lávky ve 3D s pozvolnými nájezdy, krátké podjezdy | |
 | 4 roční období, noc, déšť, sníh, mlha | |
-| auta, MHD podle jízdních řádů (GTFS), lyžaři, chodci | |
+| auta, MHD podle jízdních řádů (GTFS), lyžaři | |
 | klikací budovy s adresou, hledání, názvy částí obce | |
 | | vánoční výzdoba: strom, kluziště, stánky, zapnutá podle data (`assets/vanoce.json`, `./vanoce.sh`) |
 | | hlášení nepřesností od lidí s administrací (volitelný server, `hlaseni/`) |

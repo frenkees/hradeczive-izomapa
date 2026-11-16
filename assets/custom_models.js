@@ -851,6 +851,323 @@ export const landmarks = {
     }
     return true;
   },
+  // ---- Hlavní nádraží (funkcionalismus): hala, hodinová věž, severní křídlo kolem dvora, jižní blok s pavilonem a sochou ----
+  // Rámec z dominanty.json ("osa" -> b.osa v assets/custom_prep.py): s podél budovy k severu, t napříč k průčelí (východ, Riegrovo
+  // náměstí), z nad terénem. Půdorys, výšky a tvary střech z ortofota a laseru ČÚZK (DMP 1G), členění fasád a barvy z fotek
+  // (landmarks_ref/hlavni_nadrazi). Kamera (od jihozápadu) vidí hlavně fasádu k nástupištím (západ) a jižní čelo.
+  hlavni_nadrazi(b, { X, R, pushBox, pushQuad, pushTri, tv, ring }) {
+    let x0, y0, ang;
+    if (b.osa) [x0, y0, ang] = b.osa;
+    else {                                                                 // záloha bez osy: opsaný obdélník půdorysu
+      const F2 = frame2(b.p), fl = F2.u[1] < 0 ? -1 : 1;
+      ang = Math.atan2(F2.u[1] * fl, F2.u[0] * fl);
+      x0 = F2.cx + F2.u[0] * (F2.s0 + F2.s1) / 2 + F2.v[0] * (F2.t0 + F2.t1) / 2; y0 = F2.cy + F2.u[1] * (F2.s0 + F2.s1) / 2 + F2.v[1] * (F2.t0 + F2.t1) / 2;
+    }
+    const g = b.g, Z0 = b.b - g, ca = Math.cos(ang), sa = Math.sin(ang);
+    const F = (s, t, h) => tv(x0 + ca * s + sa * t, y0 + sa * s - ca * t, h);    // h absolutně (pushBox, ring)
+    const P = (s, t, z) => F(s, t, g + z);
+    const FIX = [0, 1, 0, 0], SNOW = [0, 1, 1, 0];
+    const WALL = C(226, 216, 190), WALL_N = C(222, 212, 186), CORN = C(238, 232, 214), PLINTH = C(140, 136, 128), LIGHTER = C(232, 223, 198);
+    const GL = C(77, 97, 128), GLR = C(150, 166, 168), BAR = C(70, 78, 84), TILE = C(170, 84, 58), FLAT = C(104, 107, 110);
+    const GLASS = C(158, 182, 178), RIB = C(104, 126, 122), GUT = C(104, 140, 124), COPPER = C(74, 120, 102), COPPER_D = C(36, 62, 57);
+    const DIAL = C(112, 60, 46), WHITE = C(244, 242, 234), BLUE = C(34, 58, 128), EMB = C(46, 84, 168), SILVER = C(214, 218, 220);
+    const BRONZE = C(76, 120, 98), BRONZE_D = C(48, 62, 56), CANOPY = C(76, 80, 86), BRICK = C(150, 82, 62);
+    const hh = (a, c, d) => Math.abs(Math.sin(a * 12.9898 + c * 78.233 + d * 37.719) * 43758.5453) % 1;
+    const box = (s0, s1, t0, t1, z0, z1, col, aw = FIX, top) => pushBox(X, F, s0, s1, t0, t1, g + z0, g + z1, col, aw, top);
+    const quad = (B, a, c, d, e, col, aw = FIX) => pushQuad(B, P(...a), P(...c), P(...d), P(...e), col, aw);
+    const tri = (B, a, c, d, col, aw = FIX) => pushTri(B, P(...a), P(...c), P(...d), col, aw);
+
+    // zdi hranolu: západní (t = tW) do zW, východní do zE, čela do nižší z obou
+    const wblock = (s0, s1, tW, tE, zW, zE = zW, col = WALL) => {
+      const zm = Math.min(zW, zE);
+      quad(X, [s0, tW, Z0], [s1, tW, Z0], [s1, tW, zW], [s0, tW, zW], col);
+      quad(X, [s1, tE, Z0], [s0, tE, Z0], [s0, tE, zE], [s1, tE, zE], col);
+      quad(X, [s0, tE, Z0], [s0, tW, Z0], [s0, tW, zm], [s0, tE, zm], col);
+      quad(X, [s1, tW, Z0], [s1, tE, Z0], [s1, tE, zm], [s1, tW, zm], col);
+    };
+    // plochá střecha (R) s atikou a římsou na vybraných stranách ('wesn' = západ, východ, jih, sever)
+    const flat = (s0, s1, t0, t1, z, sides = 'wesn', par = 0.45, corn = true) => {
+      quad(R, [s0, t0, z], [s1, t0, z], [s1, t1, z], [s0, t1, z], FLAT, [0, 0, 0, 0]);
+      const k = 0.28;
+      if (sides.includes('w')) { box(s0, s1, t0, t0 + k, z, z + par, CORN, SNOW); if (corn) box(s0, s1, t0 - 0.22, t0, z - 0.75, z - 0.35, CORN, SNOW); }
+      if (sides.includes('e')) { box(s0, s1, t1 - k, t1, z, z + par, CORN, SNOW); if (corn) box(s0, s1, t1, t1 + 0.22, z - 0.75, z - 0.35, CORN, SNOW); }
+      if (sides.includes('s')) { box(s0, s0 + k, t0, t1, z, z + par, CORN, SNOW); if (corn) box(s0 - 0.22, s0, t0, t1, z - 0.75, z - 0.35, CORN, SNOW); }
+      if (sides.includes('n')) { box(s1 - k, s1, t0, t1, z, z + par, CORN, SNOW); if (corn) box(s1, s1 + 0.22, t0, t1, z - 0.75, z - 0.35, CORN, SNOW); }
+    };
+    // okno na fasádě: osa 't' = stěna v t = c (podél s), osa 's' = stěna v s = c (podél t); sd = strana ven; lit = podíl rozsvícených v noci
+    const win = (ax, c, sd, a0, a1, z0, z1, lit = 0.5, col) => {
+      const h = hh(a0 * 1.3 + c, z0, a1 + sd), cl = col || (h > 0.86 ? GLR : GL), on = hh(a1, c * 0.7, z1 * 1.7) < lit ? 0.55 + 0.4 * hh(z0, a0, c) : 0;
+      const o = c + sd * 0.05, aw = [on, 1, 0, 0];
+      if (ax === 't') quad(X, [a0, o, z0], [a1, o, z0], [a1, o, z1], [a0, o, z1], cl, aw);
+      else quad(X, [o, a0, z0], [o, a1, z0], [o, a1, z1], [o, a0, z1], cl, aw);
+    };
+    const row = (ax, c, sd, from, to, pitch, w, z0, z1, lit) => {
+      const n = Math.max(1, Math.floor((to - from) / pitch + 1e-6)), st = from + ((to - from) - n * pitch) / 2;
+      for (let k = 0; k < n; k++) { const m = st + pitch * (k + 0.5); win(ax, c, sd, m - w / 2, m + w / 2, z0, z1, lit); }
+    };
+    // velké prosklené okno s mříží příček (rám tmavý, tabule v noci svítí)
+    const bigWin = (ax, c, sd, a0, a1, z0, z1, nv, nh, lit = 0.85) => {
+      const q = (d, a, z) => (ax === 't' ? [a, c + sd * d, z] : [c + sd * d, a, z]);
+      quad(X, q(0.04, a0, z0), q(0.04, a1, z0), q(0.04, a1, z1), q(0.04, a0, z1), BAR);
+      const bw = 0.13, da = (a1 - a0) / nv, dz = (z1 - z0) / nh;
+      for (let i = 0; i < nv; i++) for (let j = 0; j < nh; j++) {
+        const pa = a0 + da * i + bw, pb = a0 + da * (i + 1) - bw, za = z0 + dz * j + bw, zb = z0 + dz * (j + 1) - bw;
+        quad(X, q(0.07, pa, za), q(0.07, pb, za), q(0.07, pb, zb), q(0.07, pa, zb), hh(i, j, c) > 0.8 ? GLR : GL, [lit, 1, 0, 0]);
+      }
+    };
+    // okřídlené kolo (znak drah) v rovině stěny: střed a, z, poloměr r
+    const emblem = (ax, c, sd, a, z, r, col, d = 0.1) => {
+      const q = (u, w) => (ax === 't' ? P(a + u, c + sd * d, z + w) : P(c + sd * d, a + u, z + w));
+      for (let k = 0; k < 8; k++) {
+        const a0 = k / 8 * Math.PI * 2, a1 = (k + 1) / 8 * Math.PI * 2;
+        pushTri(X, q(0, 0), q(Math.cos(a0) * r, Math.sin(a0) * r), q(Math.cos(a1) * r, Math.sin(a1) * r), col, FIX);
+      }
+      for (const sg of [-1, 1]) {
+        pushQuad(X, q(sg * r * 0.7, r * 0.15), q(sg * r * 3.0, r * 0.75), q(sg * r * 3.1, r * 0.35), q(sg * r * 0.8, -r * 0.25), col, FIX);
+        pushQuad(X, q(sg * r * 0.8, -r * 0.25), q(sg * r * 2.6, r * 0.2), q(sg * r * 2.6, -r * 0.15), q(sg * r * 0.8, -r * 0.55), col, FIX);
+      }
+    };
+    // sedlová / valbová střecha: okapy podél osy a0..a1, napříč wW..wE ve výškách zW, zE, hřeben w = wR ve výšce zR,
+    // valby hs / hn (vodorovná délka, 0 = štít); osa 's' = hřeben podél s, 't' = podél t (a = t, w = s)
+    const roof = ({ ax = 's', a0, a1, wW, wE, zW, zE = zW, wR, zR, hs = 0, hn = 0, col = TILE, ov = 0.45, wc = WALL }) => {
+      const M = (a, w, z) => (ax === 's' ? [a, w, z] : [w, a, z]);
+      const kW = (zR - zW) / (wR - wW), kE = (zR - zE) / (wE - wR), zw = zW - ov * kW, ze = zE - ov * kE;
+      const b0 = a0 - (hs ? ov : 0), b1 = a1 + (hn ? ov : 0);
+      const w0 = M(b0, wW - ov, zw), w1 = M(b1, wW - ov, zw), e0 = M(b0, wE + ov, ze), e1 = M(b1, wE + ov, ze);
+      const r0 = M(a0 + hs, wR, zR), r1 = M(a1 - hn, wR, zR), aw = [1, g + zR, g + Math.min(zw, ze), 0];
+      quad(R, w0, w1, r1, r0, col, aw); quad(R, e1, e0, r0, r1, col, aw);
+      const zm = Math.min(zW, zE), hi = zW > zE ? M(0, wW, zW) : M(0, wE, zE);
+      for (const [a, hip, ee, ww, rr] of [[a0, hs, e0, w0, r0], [a1, hn, e1, w1, r1]]) {
+        if (hip) tri(R, ee, ww, rr, col, aw);
+        else {
+          tri(X, M(a, wW, zm), M(a, wE, zm), M(a, wE, zE), wc); tri(X, M(a, wW, zm), M(a, wE, zE), M(a, wR, zR), wc); tri(X, M(a, wW, zm), M(a, wR, zR), M(a, wW, zW), wc);
+        }
+        if (hip && Math.abs(zW - zE) > 0.05) { const h_ = [...hi]; h_[ax === 's' ? 0 : 1] = a; tri(X, M(a, wW, zm), M(a, wE, zm), h_, wc); }
+      }
+      // okapní žlaby (měděné, zelenavé)
+      const gut = (w, z, sg) => { const [p, q] = ax === 's' ? [[b0, b1], [Math.min(w, w + sg * 0.2), Math.max(w, w + sg * 0.2)]] : [[Math.min(w, w + sg * 0.2), Math.max(w, w + sg * 0.2)], [b0, b1]]; box(p[0], p[1], q[0], q[1], z - 0.22, z, GUT, SNOW); };
+      gut(wW - ov, zw, -1); gut(wE + ov, ze, 1);
+    };
+    // prosklená střecha haly: okapy s0..s1 / tW..tE ve výšce z0, hřeben tR ve výšce zR, jižní valba hs (sever = štít);
+    // tabule mezi příčkami po 1,3 m a třech podélných pásech, v noci prosvítá světlo haly
+    const glassRoof = (s0, s1, tW, tE, z0, tR, zR, hs, glow = 0.52) => {
+      const awG = [glow, 1, 1, 0], awR = [0, 1, 1, 0], up = 0.035;
+      const slope = (tE_, sg) => {                                        // sg -1 = západní, +1 = východní
+        const pt = (s, f, d = 0) => [s, tE_ + (tR - tE_) * f, z0 + (zR - z0) * f + d];
+        const smin = (f) => s0 + hs * f;
+        quad(X, pt(s0, 0), pt(s1, 0), pt(s1, 1), pt(smin(1), 1), RIB, awR);
+        const NB = 3;
+        for (let j = 0; j < NB; j++) {
+          const fa = j / NB + 0.03, fb = (j + 1) / NB - 0.03;
+          for (let s = s0; s < s1 - 0.2; s += 1.3) {
+            const sb = Math.min(s + 1.3, s1) - 0.09, la = Math.max(s + 0.09, smin(fa) + 0.12), lb = Math.max(s + 0.09, smin(fb) + 0.12);
+            if (lb >= sb) continue;
+            const c = hh(s, j, sg) > 0.85 ? GLASS.map((q) => q * 1.08) : GLASS;
+            quad(X, pt(la, fa, up), pt(sb, fa, up), pt(sb, fb, up), pt(lb, fb, up), c, awG);
+          }
+        }
+      };
+      slope(tW, -1); slope(tE, 1);
+      if (hs) {                                                            // jižní valba: vodorovné pásy, svislé příčky
+        const pt = (f, t, d = 0) => [s0 + hs * f, t, z0 + (zR - z0) * f + d];
+        tri(X, pt(0, tE), pt(0, tW), pt(1, tR), RIB, awR);
+        const NB = 3;
+        for (let j = 0; j < NB; j++) {
+          const fa = j / NB + 0.03, fb = (j + 1) / NB - 0.03;
+          const la = tW + (tR - tW) * fa, ra = tE - (tE - tR) * fa, lb = tW + (tR - tW) * fb, rb = tE - (tE - tR) * fb;
+          for (let t = tW; t < tE - 0.2; t += 1.3) {
+            const ta = t + 0.09, tb = t + 1.3 - 0.09;
+            const A0 = Math.max(ta, la), A1 = Math.min(tb, ra), B0 = Math.max(ta, lb), B1 = Math.min(tb, rb);
+            if (A1 - A0 < 0.1 || B1 - B0 < 0.05) continue;
+            quad(X, pt(fa, A0, up), pt(fa, A1, up), pt(fb, B1, up), pt(fb, B0, up), GLASS, awG);
+          }
+        }
+        box(s0 - 0.3, s0, tW, tE, z0 - 0.3, z0, GUT, SNOW);
+      } else tri(X, [s0, tW, z0], [s0, tE, z0], [s0, tR, zR], WALL);
+      tri(X, [s1, tE, z0], [s1, tW, z0], [s1, tR, zR], WALL);
+      box(s0 + hs, s1, tR - 0.18, tR + 0.18, zR - 0.1, zR + 0.12, GUT, SNOW);            // hřebenáč
+      box(s0, s1, tW - 0.3, tW, z0 - 0.3, z0, GUT, SNOW); box(s0, s1, tE, tE + 0.3, z0 - 0.3, z0, GUT, SNOW);   // okapy
+    };
+
+    // ===== jižní blok (12,6 m) a nárožní pavilon (17,4 m) se sochou =====
+    wblock(-76, -66, -19.2, 12.15, 12.2);
+    flat(-76, -66, -19.2, 12.15, 12.2, 'wsn');
+    box(-76.06, -66, -19.26, 12.21, Z0, 0.55, PLINTH, FIX);
+    row('s', -76, -1, -19.2, 12.15, 3.13, 1.5, 0.9, 3.4, 0.6);          // jižní čelo: přízemí a dvě patra
+    row('s', -76, -1, -19.2, 12.15, 3.13, 1.5, 4.9, 7.1, 0.45);
+    row('s', -76, -1, -19.2, 12.15, 3.13, 1.5, 8.3, 10.5, 0.45);
+    for (const [z0, z1] of [[4.9, 7.1], [8.3, 10.5]]) row('t', -19.2, -1, -76, -66, 3.3, 1.5, z0, z1, 0.45);   // k nástupištím
+    for (const [z0, z1] of [[0.9, 3.4], [4.9, 7.1], [8.3, 10.5]]) row('t', 12.15, 1, -76, -68.2, 3.6, 1.5, z0, z1, 0.45);
+    wblock(-68.2, -62.3, 5.5, 13.5, 17.0);
+    flat(-68.2, -62.3, 5.5, 13.5, 17.0);
+    for (const [z0, z1] of [[0.9, 3.6], [4.6, 6.8], [8.0, 10.2], [11.4, 13.6], [14.6, 16.1]]) win('t', 13.5, 1, -66.0, -64.5, z0, z1, 0.4);
+    win('s', -68.2, -1, 8.8, 10.2, 13.6, 15.8, 0.4);
+    {                                                                      // socha na pavilonu: okřídlená postava na měděném podstavci
+      const sc = -65.25, tc = 9.5, f = (a, d, h) => F(sc + a, tc + d, h), z = g + 17.0;
+      pushBox(X, f, -1.4, 1.4, -1.4, 1.4, z, z + 0.5, CORN, SNOW);
+      ring(X, f, 1.25, 1.15, z + 0.5, z + 1.3, 8, BRONZE, SNOW, Math.PI / 8);
+      ring(X, f, 1.15, 0.55, z + 1.3, z + 1.9, 8, BRONZE, SNOW, Math.PI / 8);
+      pushBox(X, f, -0.3, 0.3, -0.25, 0.25, z + 1.9, z + 3.5, BRONZE_D, FIX);
+      pushBox(X, f, -0.18, 0.18, -0.16, 0.16, z + 3.5, z + 3.9, BRONZE_D, FIX);
+      for (const sg of [-1, 1]) {                                          // křídla rozepjatá podél průčelí
+        pushQuad(X, f(sg * 0.25, 0, z + 3.3), f(sg * 1.9, -0.1, z + 4.5), f(sg * 2.2, -0.1, z + 3.9), f(sg * 0.3, 0, z + 2.6), BRONZE_D, FIX);
+        pushQuad(X, f(sg * 0.3, 0.02, z + 2.6), f(sg * 2.2, -0.08, z + 3.9), f(sg * 1.8, -0.08, z + 3.2), f(sg * 0.3, 0.02, z + 2.2), BRONZE, FIX);
+      }
+    }
+
+    // ===== odbavovací hala =====
+    // střední loď pod prosklenou střechou (okap 15,3 m, hřeben 19,7 m), sever končí štítem u křídla
+    wblock(-67, -2.5, -10, 5.5, 15.3);
+    glassRoof(-67, -2.5, -10, 5.5, 15.3, -2.25, 19.7, 6.6);
+    // západní trakt k nástupištím: výšky z laseru (14,4 / 12,6 / 14,4 m)
+    const WS = [[-66, -48, 14.4], [-48, -22, 12.6], [-22, -7.5, 14.4]];
+    for (const [s0, s1, z] of WS) { wblock(s0, s1, -19.2, -10, z); flat(s0, s1, -19.2, -10, z, 'w'); }
+    box(-66, -7.5, -19.26, -19.2, Z0, 0.55, PLINTH);
+    row('t', -10, -1, -48, -22, 2.9, 1.3, 13.4, 14.6, 0.5);               // okénka v nadsvětlí nad nižší částí
+    // fasáda k nástupištím (t = -19,2): přízemí pod přístřeškem, dvě patra oken, dvě velká okna s okřídleným kolem
+    row('t', -19.2, -1, -66, -7.5, 2.9, 1.7, 0.5, 3.8, 0.75);
+    for (const [z0, z1] of [[6.4, 9.0], [10.2, 12.6]]) { row('t', -19.2, -1, -66, -48, 2.9, 1.5, z0, z1, 0.55); row('t', -19.2, -1, -22, -14.2, 2.75, 1.5, z0, z1, 0.55); }
+    for (const [z0, z1] of [[6.2, 8.4], [9.4, 11.4]]) { row('t', -19.2, -1, -48, -44.5, 2.9, 1.4, z0, z1, 0.55); row('t', -19.2, -1, -33.5, -22, 2.85, 1.5, z0, z1, 0.55); }
+    bigWin('t', -19.2, -1, -44.3, -33.7, 4.6, 11.4, 8, 5);
+    bigWin('t', -19.2, -1, -14.0, -8.3, 4.6, 12.6, 4, 6);
+    emblem('t', -19.2, -1, -39.0, 8.4, 0.75, EMB, 0.12); emblem('t', -19.2, -1, -11.15, 9.0, 0.6, EMB, 0.12);
+    for (const [s0, s1] of [[-44.6, -44.3], [-33.7, -33.4], [-14.3, -14.0], [-8.3, -8.0]]) box(s0, s1, -19.45, -19.2, 4.3, s0 > -15 ? 12.9 : 11.7, LIGHTER);
+    // východní trakt a průčelí k náměstí (t = 15,6): 16 pilastrů, okna, markýza, velké okno u věže, nápis na střeše
+    wblock(-62.3, -6.98, 5.5, 15.6, 14.4);
+    flat(-62.3, -6.98, 5.5, 15.6, 14.4, 'e', 0.5, false);
+    box(-62.3, -6.98, 15.6, 15.85, 12.85, 13.15, CORN, SNOW);
+    const B0 = -62.3, BW = (-20.5 - B0) / 15;
+    for (let k = 0; k <= 15; k++) box(B0 + k * BW - (k ? 0.45 : 0), B0 + k * BW + (k < 15 ? 0.45 : 0), 15.6, 16.0, 4.75, 12.85, LIGHTER);
+    for (let k = 0; k < 15; k++) {
+      const a = B0 + k * BW + 0.6, c = B0 + (k + 1) * BW - 0.6;
+      if (k < 5) win('t', 15.6, 1, a, c, 5.6, 12.4, 0.8);
+      else { win('t', 15.6, 1, a, c, 6.0, 8.8, 0.6); win('t', 15.6, 1, a, c, 10.0, 12.4, 0.6); }
+      win('t', 15.6, 1, a - 0.1, c + 0.1, 0.4, 3.9, 0.85);
+    }
+    bigWin('t', 15.6, 1, -20.0, -7.9, 4.9, 12.9, 9, 6);
+    box(-20.6, -20.0, 15.6, 16.4, 4.75, 13.5, LIGHTER); box(-7.9, -7.3, 15.6, 16.4, 4.75, 13.5, LIGHTER); box(-20.6, -7.3, 15.6, 16.4, 12.9, 13.5, LIGHTER, SNOW);
+    win('t', 15.6, 1, -19.6, -8.3, 0.3, 4.0, 0.9);
+    box(-62.3, -7.0, 15.6, 20.9, 4.35, 4.75, CANOPY, SNOW, C(196, 196, 192));         // markýza
+    {                                                                      // nápis HRADEC KRÁLOVÉ HL.N. (písmo 3 × 5, výška ~0,85 m)
+      const txt = 'HRADEC KRÁLOVÉ HL.N.', cell = 0.168, zb = g + 15.0, tt = 15.15;
+      let s = -50.3;
+      const ff = (a, d, h) => F(a, tt + d, h);
+      pushBox(X, ff, s - 0.3, -37.7, -0.04, 0.04, zb - 0.6, zb - 0.5, SILVER, FIX);
+      for (const ch of txt) {
+        const base = { 'Á': 'A', 'É': 'E' }[ch] || ch, gl = ch === '.' ? [0, 0, 0, 0, 4] : (ZN_FONT[base] || ZN_FONT[' ']);
+        for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++) if (gl[r] & (4 >> c))
+          pushBox(X, ff, s + c * cell, s + (c + 1) * cell, -0.06, 0.06, zb + (4 - r) * cell, zb + (5 - r) * cell, BLUE, FIX);
+        if (base !== ch) pushBox(X, ff, s + 2 * cell, s + 3 * cell, -0.06, 0.06, zb + 5.3 * cell, zb + 6.3 * cell, BLUE, FIX);
+        if (ch !== ' ' && ch !== '.') pushBox(X, ff, s + cell, s + 2 * cell, -0.03, 0.03, zb - 0.5, zb, SILVER, FIX);
+        s += ch === '.' ? 2 * cell : 4 * cell;
+      }
+      for (const se of [-53.2, -34.8]) {                                   // okřídlená kola na stožárcích po stranách nápisu
+        box(se - 0.05, se + 0.05, tt - 0.05, tt + 0.05, 14.4, 16.1, SILVER);
+        emblem('t', tt, 1, se, 16.55, 0.42, SILVER, 0.02);
+      }
+    }
+    // blok mezi halou a věží (19,2 m)
+    wblock(-9.0, -1.6, 3.5, 11.64, 19.2);
+    flat(-9.0, -1.6, 3.5, 11.64, 19.2, 'wesn', 0.4);
+    for (const t of [5.6, 7.6, 9.6]) win('s', -9.0, -1, t - 0.6, t + 0.6, 15.6, 17.8, 0.5);
+
+    // ===== hodinová věž: dřík 5,45 × 8,4 m do 38,8 m, lucerna z měděných žeber do 46,9 m =====
+    {
+      const S0 = -6.98, S1 = -1.53, T0 = 11.64, T1 = 20.03, H = 38.8, sc = (S0 + S1) / 2, tc = (T0 + T1) / 2;
+      wblock(S0, S1, T0, T1, H, H, C(224, 216, 194));
+      box(S0 - 0.06, S1 + 0.06, T0 - 0.06, T1 + 0.06, Z0, 0.6, PLINTH);
+      box(S0 - 0.16, S1 + 0.16, T0 - 0.16, T1 + 0.16, H - 0.45, H, CORN, SNOW);
+      // líce věže: a = vodorovně (vpravo pro pozorovatele), d = ven, z
+      const faces = [
+        [(a, d) => [sc + a, T1 + d], S1 - S0], [(a, d) => [sc - a, T0 - d], S1 - S0],     // východ (průčelí), západ
+        [(a, d) => [S0 - d, tc + a], T1 - T0], [(a, d) => [S1 + d, tc - a], T1 - T0],     // jih, sever
+      ];
+      const TIME = [10, 8];
+      for (const [m] of faces) {
+        const Ff = (a, d, z) => P(...m(a, d), z), Fb = (a, d, h) => F(...m(a, d), h);
+        const zc = 34.25, R_ = 1.55;
+        pushBox(X, Fb, -R_, R_, 0, 0.14, g + zc - R_, g + zc + R_, DIAL, FIX);            // čtvercový ciferník
+        pushBox(X, Fb, -R_ - 0.12, R_ + 0.12, 0, 0.1, g + zc - R_ - 0.12, g + zc + R_ + 0.12, C(80, 66, 56), FIX);
+        const LW = [0.75, 1, 0, 0];
+        for (let k = 0; k < 12; k++) {                                     // hodinové značky
+          const a = k / 12 * Math.PI * 2, r0 = k % 3 ? 1.12 : 0.95, r1 = 1.38, w = k % 3 ? 0.07 : 0.1, ca_ = Math.sin(a), cz = Math.cos(a);
+          pushQuad(X, Ff(ca_ * r0 - cz * w, 0.17, zc + cz * r0 + ca_ * w), Ff(ca_ * r1 - cz * w, 0.17, zc + cz * r1 + ca_ * w), Ff(ca_ * r1 + cz * w, 0.17, zc + cz * r1 - ca_ * w), Ff(ca_ * r0 + cz * w, 0.17, zc + cz * r0 - ca_ * w), WHITE, LW);
+        }
+        const hand = (a, L, w) => { const sx = Math.sin(a), cz = Math.cos(a); pushQuad(X, Ff(-sx * 0.2 - cz * w, 0.2, zc - cz * 0.2 + sx * w), Ff(sx * L - cz * w, 0.2, zc + cz * L + sx * w), Ff(sx * L + cz * w, 0.2, zc + cz * L - sx * w), Ff(-sx * 0.2 + cz * w, 0.2, zc - cz * 0.2 - sx * w), WHITE, LW); };
+        hand((TIME[0] + TIME[1] / 60) / 12 * Math.PI * 2, 0.82, 0.1); hand(TIME[1] / 60 * Math.PI * 2, 1.25, 0.07);
+        for (const sg of [-1, 1]) {                                         // lampy na výložnících v rozích nahoře
+          const a = sg * (Math.abs(m(1, 0)[0] - m(0, 0)[0]) > 0.5 ? (S1 - S0) : (T1 - T0)) / 2;
+          pushBox(X, Fb, a - 0.08, a + 0.08, 0, 0.7, g + H - 1.3, g + H - 1.2, C(60, 62, 66), FIX);
+          pushBox(X, Fb, a - 0.14, a + 0.14, 0.55, 0.85, g + H - 1.55, g + H - 1.2, C(250, 236, 200), [1, 1, 0, 0]);
+        }
+      }
+      // svislý pás oken pod hodinami v průčelí, dveře do věže
+      for (let z = 4.2; z < 31.0; z += 2.6) win('t', T1, 1, sc - 0.42, sc + 0.42, z, z + 1.7, 0.35);
+      win('t', T1, 1, sc - 0.9, sc + 0.9, 0.2, 3.0, 0.9, C(70, 58, 50));
+      // lucerna: tmavé jádro, měděná žebra, odstupňované zakončení, anténa
+      const L0 = -5.6, L1 = -2.9, M0 = 13.2, M1 = 18.5, LH = 45.5;
+      box(L0 - 0.25, L1 + 0.25, M0 - 0.25, M1 + 0.25, H, H + 0.45, COPPER, SNOW);
+      box(L0, L1, M0, M1, H + 0.45, LH, COPPER_D);
+      for (const [a0, a1, b0, b1] of [[L0 - 0.3, L0 + 0.15, M0 - 0.3, M0 + 0.15], [L1 - 0.15, L1 + 0.3, M0 - 0.3, M0 + 0.15], [L0 - 0.3, L0 + 0.15, M1 - 0.15, M1 + 0.3], [L1 - 0.15, L1 + 0.3, M1 - 0.15, M1 + 0.3]])
+        box(a0, a1, b0, b1, H + 0.45, LH + 0.2, COPPER);                   // nárožní pilíře
+      for (let k = 1; k < 6; k++) { const t = M0 + (M1 - M0) * k / 6; box(L0 - 0.25, L0, t - 0.16, t + 0.16, H + 0.45, LH - 0.2, COPPER); box(L1, L1 + 0.25, t - 0.16, t + 0.16, H + 0.45, LH - 0.2, COPPER); }
+      for (let k = 1; k < 3; k++) { const s = L0 + (L1 - L0) * k / 3; box(s - 0.16, s + 0.16, M0 - 0.25, M0, H + 0.45, LH - 0.2, COPPER); box(s - 0.16, s + 0.16, M1, M1 + 0.25, H + 0.45, LH - 0.2, COPPER); }
+      box(L0 - 0.1, L1 + 0.1, M0 - 0.1, M1 + 0.1, LH - 0.2, LH + 0.5, COPPER, SNOW);
+      box(L0 + 0.35, L1 - 0.35, M0 + 0.5, M1 - 0.5, LH + 0.5, LH + 1.0, COPPER, SNOW);
+      box(L0 + 0.75, L1 - 0.75, M0 + 1.1, M1 - 1.1, LH + 1.0, LH + 1.4, COPPER, SNOW);
+      box(sc - 0.05, sc + 0.05, tc - 0.05, tc + 0.05, LH + 1.4, LH + 5.2, C(70, 72, 76));   // anténa
+      box(sc - 0.05, sc + 0.05, tc - 0.6, tc + 0.6, LH + 3.6, LH + 3.7, C(70, 72, 76));
+    }
+
+    // ===== severní křídlo: dva trakty kolem dvora, příčný trakt na severu, sedlové taškové střechy (hřebeny 19,5 m) =====
+    wblock(-7.5, 30, -19.2, -5.5, 13.5, 13.5, WALL_N);
+    roof({ a0: -7.5, a1: 30, wW: -19.2, wE: -5.5, zW: 13.5, wR: -12.4, zR: 19.5, hs: 6.85, wc: WALL_N });
+    wblock(30, 75.7, -19.2, -6.0, 16.0, 15.3, WALL_N);
+    roof({ a0: 30, a1: 75.7, wW: -19.2, wE: -6.0, zW: 16.0, zE: 15.3, wR: -15.0, zR: 19.5, hn: 6.0, wc: WALL_N });
+    box(-7.5, 75.7, -19.26, -19.2, Z0, 0.55, PLINTH);
+    // fasáda k nástupištím: přízemí (pod přístřeškem) a patra po 2,75 m
+    row('t', -19.2, -1, -6.5, 30, 2.75, 1.6, 0.5, 3.8, 0.7);
+    for (const [z0, z1] of [[5.3, 7.3], [8.3, 10.3], [11.2, 12.8]]) row('t', -19.2, -1, -6.5, 30, 2.75, 1.35, z0, z1, 0.45);
+    row('t', -19.2, -1, 30, 75.7, 2.75, 1.6, 0.5, 3.8, 0.6);
+    for (const [z0, z1] of [[5.3, 7.3], [8.5, 10.5], [11.7, 13.7]]) row('t', -19.2, -1, 30, 75.7, 2.75, 1.35, z0, z1, 0.45);
+    row('t', -19.2, -1, 30, 75.7, 2.75, 1.0, 14.5, 15.4, 0.3);
+    for (const [z0, z1] of [[0.6, 3.6], [5.0, 7.0], [8.4, 10.4], [11.8, 13.8]]) row('s', 75.7, 1, -19.2, 15.6, 2.9, 1.4, z0, z1, 0.4);
+    // východní trakt k náměstí, hřeben mimo střed (laser)
+    wblock(-1.5, 75.7, 1.0, 15.6, 15.4, 15.4, WALL_N);
+    roof({ a0: -1.5, a1: 75.7, wW: 1.0, wE: 15.6, zW: 15.4, wR: 10.0, zR: 19.5, hs: 5.6, hn: 5.6, wc: WALL_N });
+    for (const [z0, z1] of [[1.0, 3.6], [5.0, 7.2], [8.4, 10.6], [12.2, 14.2]]) row('t', 15.6, 1, 32.3, 75.7, 2.9, 1.5, z0, z1, 0.45);
+    for (const [z0, z1] of [[9.8, 11.2], [12.4, 14.2]]) row('t', 15.6, 1, -1.5, 32.3, 3.76, 1.6, z0, z1, 0.45);
+    for (const [z0, z1] of [[1.0, 3.4], [5.0, 7.0], [8.4, 10.4]]) row('t', 1.0, -1, 40, 61, 2.9, 1.4, z0, z1, 0.4);
+    row('t', 1.0, -1, -1.5, 75.7, 2.9, 1.4, 12.2, 14.0, 0.4);
+    // přízemní hala před východním traktem (9,2 m): vysoká okna mezi pilíři
+    wblock(-1.5, 32.3, 15.6, 19.3, 8.8);
+    flat(-1.5, 32.3, 15.6, 19.3, 8.8, 'esn', 0.45);
+    {
+      const n = 9, d = (32.3 + 1.5) / n;
+      for (let k = 0; k < n; k++) { const a = -1.5 + d * k + 0.5, c = -1.5 + d * (k + 1) - 0.5; win('t', 19.3, 1, a, c, 0.5, 7.6, 0.85); }
+      for (let k = 0; k <= n; k++) box(-1.5 + d * k - 0.45, -1.5 + d * k + 0.45, 19.3, 19.5, Z0, 8.0, LIGHTER);
+      box(-1.5, 32.3, 19.3, 19.55, 7.9, 8.4, CORN, SNOW);
+    }
+    // příčný trakt na severu (hřeben podél t), štíty schované pod střechami traktů
+    roof({ ax: 't', a0: -15.0, a1: 10.0, wW: 61.0, wE: 75.7, zW: 16.0, wR: 68.35, zR: 19.5, wc: WALL_N });
+    quad(X, [61, 1.0, Z0], [61, -6.0, Z0], [61, -6.0, 16.0], [61, 1.0, 16.0], WALL_N);
+    for (const [z0, z1] of [[1.0, 3.4], [5.0, 7.0], [8.4, 10.4], [11.8, 13.8]]) row('s', 61, -1, -6.0, 1.0, 2.6, 1.3, z0, z1, 0.4);
+    // dvůr: nízká prosklená střecha nad jižní částí, nízké přístavky, otevřená část s - 40..61
+    wblock(-1.5, 33, -5.5, 1.0, 10.0);
+    glassRoof(-1.5, 33, -5.5, 1.0, 10.0, -2.25, 11.4, 0, 0.51);
+    wblock(33, 40, -6.0, 1.0, 12.2); flat(33, 40, -6.0, 1.0, 12.2, 'sn', 0.3, false);
+    wblock(46, 60, -6.0, -3.5, 8.4); flat(46, 60, -6.0, -3.5, 8.4, 'e', 0.3, false);
+    wblock(40, 44, -6.0, 1.0, 3.9); flat(40, 44, -6.0, 1.0, 3.9, 'e', 0.3, false);
+    // komíny a vikýře
+    for (const [s, t, z] of [[22, 10.0, 19.2], [58, 10.0, 19.2], [12, -12.4, 19.2], [50, -15.0, 19.2]]) box(s - 0.45, s + 0.45, t - 0.35, t + 0.35, z - 1.5, z + 1.3, BRICK, SNOW, C(70, 60, 56));
+    for (const s of [46, 52, 58, 64]) {                                   // vikýře na západní straně východního traktu (ke dvoru)
+      const zb = 15.4 + (4.0 - 1.0) * (4.1 / 9.0);
+      box(s - 0.8, s + 0.8, 4.0, 6.6, zb - 0.3, zb + 1.6, WALL_N);
+      box(s - 1.0, s + 1.0, 3.8, 6.6, zb + 1.6, zb + 1.85, TILE, SNOW);
+      win('t', 4.0, -1, s - 0.45, s + 0.45, zb + 0.3, zb + 1.3, 0.4);
+    }
+    return true;
+  },
 };
 
 // ---------- velikonoční vajíčko: zaparkovaná auta (props.egg = [x, y, z, úhel, typ]; + je přední část vozu) ----------

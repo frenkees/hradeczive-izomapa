@@ -852,3 +852,29 @@ if HOOK == 'props':
             for b in buildings:
                 if b is tgt or b.get('dn') == d['name'] or len(b['p']) < 3: continue
                 if zp.contains(Polygon(b['p']).centroid): b['e'] = round(b['g'] + 0.3, 2); b['r'] = 'flat'; b['parts'] = []; b['rh'] = 0.0; b.pop('rt', None); b.pop('ch', None)
+
+# ---- vlastní model s osou v lat/lon (Hlavní nádraží): "spec": {"lm": ..., "osa": [lat, lon, úhel°], "nahradit": [[lat, lon], …],
+#      "prebarvit": [{"q": [[lat, lon], …], "rc": [r, g, b]}]} ----
+# osa = počátek a směr podélné osy modelu (úhel od východu proti směru hodin) převedené do souřadnic čtverce (b['osa'] = [x, y, rad]),
+# takže model sedí stejně ve všech čtvercích, které budovu kreslí (pás sousedů u švu). "nahradit": budovy z dat uvnitř obrysu
+# (věž nádraží jako samostatný dům) srovnat k zemi, model je nahradí; obrys pro najetí myší a zakrývání vozidel zůstane z dat.
+# "prebarvit": střechy budov z dat uvnitř obrysu (přístřešek 1. nástupiště) dostanou barvu z fotek.
+if HOOK == 'props':
+    for d in DOMS:
+        sp_ = d['spec']
+        if 'osa' not in sp_: continue
+        pcs = [b for b in buildings if b.get('dn') == d['name']]
+        if not pcs: continue
+        ox_, oy_ = to_local(sp_['osa'][1], sp_['osa'][0])
+        for b in pcs: b['osa'] = [round(float(ox_), 3), round(float(oy_), 3), round(math.radians(sp_['osa'][2]), 6)]
+        if sp_.get('nahradit'):
+            zp = Polygon([to_local(lo, la) for la, lo in sp_['nahradit']])
+            for b in buildings:
+                if b.get('dn') == d['name'] or len(b['p']) < 3: continue
+                if zp.contains(Polygon(b['p']).centroid):
+                    b['e'] = round(b['g'] + 0.2, 2); b['r'] = 'flat'; b['parts'] = []; b['rh'] = 0.0
+                    for k_ in ('rt', 'ch', 'dm', 'tw', 'dz'): b.pop(k_, None)
+        for pb in sp_.get('prebarvit', []):
+            zp = Polygon([to_local(lo, la) for la, lo in pb['q']])
+            for b in buildings:
+                if b.get('dn') != d['name'] and len(b['p']) >= 3 and zp.contains(Polygon(b['p']).centroid): b['rc'] = list(pb['rc'])

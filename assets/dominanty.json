@@ -397,45 +397,70 @@
   "name": "Hlavní nádraží",
   "lat": 50.214528,
   "lon": 15.810767,
-  "text": "Funkcionalistická budova hlavního nádraží s hodinovou věží v průčelí k Riegrovu náměstí. Podle fotek z Wikimedia Commons a ortofota ČÚZK.",
+  "text": "Funkcionalistická budova hlavního nádraží s hodinovou věží (podle laserového měření asi 47 m) v průčelí k Riegrovu náměstí: odbavovací hala s prosklenou valbovou střechou a pilastry v průčelí, nápis HRADEC KRÁLOVÉ HL. N. na střeše, severní křídlo s červenými taškovými střechami kolem dvora a jižní nárožní pavilon se sochou. Model podle fotek z Wikimedia Commons, ortofota a laserového měření ČÚZK (DMP 1G).",
   "spec": {
+   "lm": "hlavni_nadrazi",
+   "h": 0.2,
+   "r": "flat",
+   "top": 19.7,
    "wc": [
     226,
-    220,
-    200
+    216,
+    190
    ],
    "rc": [
-    156,
-    84,
-    62
+    150,
+    150,
+    146
    ],
-   "r": "gabled",
-   "h": 13.5,
-   "rh": 6,
-   "win": 8,
-   "face": [
-    50.21434,
-    15.81174
+   "osa": [
+    50.2145209,
+    15.8107876,
+    80.053
    ],
-   "towers": [
+   "nahradit": [
+    [
+     50.2144362,
+     15.8109199
+    ],
+    [
+     50.2144958,
+     15.8109361
+    ],
+    [
+     50.2144807,
+     15.8110702
+    ],
+    [
+     50.214421,
+     15.811054
+    ]
+   ],
+   "prebarvit": [
     {
-     "at": "front",
-     "side": 0,
-     "w": 8.5,
-     "h": 40,
-     "top": "pyramid",
-     "to": 44,
-     "tc": [
-      96,
-      142,
-      122
+     "q": [
+      [
+       50.2138869,
+       15.8102232
+      ],
+      [
+       50.2151607,
+       15.8105699
+      ],
+      [
+       50.2151474,
+       15.8106874
+      ],
+      [
+       50.2138736,
+       15.8103407
+      ]
      ],
-     "wc": [
-      218,
-      212,
-      194
-     ],
-     "clock": 1
+     "rc": [
+      156,
+      58,
+      44
+     ]
     }
    ]
   }

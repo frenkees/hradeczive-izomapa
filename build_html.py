@@ -71,6 +71,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'TITULEK': E(M['titulek']), 'POPIS': E(M['popis']), 'MESTO': E(M['nazev']), 'H1_A': E(M['h1'][0]), 'H1_B': E(M['h1'][1]),
         'PODTITUL': E(M['podtitul']),
         'HLASENI': 'true' if M.get('hlaseni') else 'false',
+        'ODKAZY': ''.join(f'<a class="px-btn community" href="{E(o["url"])}" target="_blank" rel="noopener">{E(o["text"])}</a>' for o in (M.get('odkazy') or [])),
         'VITR': 'true' if M.get('vitr') else 'false',
         'POCASI': 'true' if M.get('pocasi') else 'false',
         'LETADLA': 'true' if M.get('letadla', False) else 'false',
@@ -141,7 +142,7 @@ SITE_URL = (MESTO.get('url') or '').rstrip('/')
 open('site/robots.txt', 'w').write('User-agent: *\nAllow: /\n' + (f'Sitemap: {SITE_URL}/sitemap.xml\n' if SITE_URL else ''))
 if SITE_URL:
     open('site/sitemap.xml', 'w').write(f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>{SITE_URL}/</loc></url></urlset>\n')
-if MESTO.get('hlaseni'):                              # volitelná administrace hlášení (server v hlaseni/)
+if MESTO.get('hlaseni') and MESTO.get('hlaseni') != 'github':   # volitelná administrace hlášení (server v hlaseni/)
     open('site/admin.html', 'w', encoding='utf-8').write(open('hlaseni/admin.html', encoding='utf-8').read())
 
 if os.path.isdir('obce'):

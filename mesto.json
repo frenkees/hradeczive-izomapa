@@ -117,5 +117,12 @@
   "vlak": {
     "vychozi": "regionova",
     "linky": {}
-  }
+  },
+  "hlaseni": "github",
+  "odkazy": [
+    {
+      "text": "Facebook skupina",
+      "url": "https://www.facebook.com/groups/1017224468087648"
+    }
+  ]
 }

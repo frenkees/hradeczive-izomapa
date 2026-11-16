@@ -92,6 +92,9 @@ details summary { cursor: pointer; font-family: var(--display); font-size: .78re
 .places { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 1px; }
 .places button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; padding: 6px 8px; font-size: .9rem; }
 .places button:hover, .places button:focus-visible { background: var(--panel-2); outline: 1px solid var(--edge); }
+.community-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.community-row:empty { display: none; }
+a.community { text-decoration: none; text-align: center; flex: 1 1 auto; }
 .about p { margin: 6px 0 0; font-size: .8rem; line-height: 1.45; color: var(--muted); }
 .about strong { color: var(--ink); }
 .about .author { color: var(--ink); }
@@ -319,6 +322,8 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     </div>
   </div>
 
+  <div class="community-row">{{ODKAZY}}</div>
+
   <details id="placesBox">
     <summary>Místa a&nbsp;příběhy</summary>
     <ul class="places" id="places"></ul>
@@ -341,8 +346,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   <div id="cardExtra"></div>
   <div class="links" id="cardLinks"></div>
   <details class="report" id="report" hidden>
-    <summary>Nahlásit nepřesnost</summary>
+    <summary>Navrhnout změnu / nahlásit chybu</summary>
     <form id="reportForm">
+      <input id="repWeb" name="web" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
       <textarea id="repNote" rows="3" maxlength="500" required placeholder="Co tu nesedí se skutečností?"></textarea>
       <button class="px-btn" type="submit">Odeslat</button>
       <span id="repMsg" role="status"></span>
@@ -840,7 +846,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       return `https://github.com/frenkees/hradeczive/issues/new?title=${encodeURIComponent('Mapa: ' + title)}&body=${encodeURIComponent(body)}`;
     };
     rb.href = issueUrl(); rb.addEventListener('click', () => { rb.href = issueUrl(); });
-    links.append(rb);
+    if (!HLASENI) links.append(rb);                        // s formulářem (hlaseni v mesto.json) se hlášení posílá přímo z webu
     $('card').style.transform = '';
     $('card').hidden = false;
     for (const p of PLUGINS) if (p.card) try { p.card({ title, lon, lat, el: $('cardExtra') }); } catch (e) { console.warn(e); }
@@ -862,7 +868,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     repMsg('Odesílám…', '');
     try {
       const r = await fetch('api/report', { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...repTarget, note: $('repNote').value.trim() }) });
+        body: JSON.stringify({ ...repTarget, note: $('repNote').value.trim(), hp: $('repWeb').value, url: location.href }) });
       const d = await r.json().catch(() => ({}));
       if (d.ok) { $('repNote').value = ''; repMsg('Díky! Hlášení je odeslané.', 'ok'); }
       else repMsg(d.msg || 'Hlášení se nepovedlo odeslat. Zkuste to prosím za chvíli.', 'err');

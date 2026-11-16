@@ -981,7 +981,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     state.sel = b;
     const pl = placeOf(b);
     const nm = pl ? pl.name : b.name;
-    if (nm === STANICE.nazev && MHD.names && MHD.trips) { BD.auto = true; showStation(b); return; }
+    if (nm && (STANICE.re.test(nm) || nm === STANICE.nazev) && MHD.names && MHD.trips) { BD.auto = true; showStation(b); return; }
     const story = (pl && pl.text) || b.text || (nm && placeByName[nm] ? placeByName[nm].text : null);
     const title = nm || b.cls[0].toUpperCase() + b.cls.slice(1);
     showCard({ title, text: story, lon: b.lon, lat: b.lat, k: b.k, rows: [
@@ -1946,15 +1946,28 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     BD.built = true; BD.shown = Array.from({ length: BD.n }, () => BD.w.map((w) => ' '.repeat(w)));
   }
   const bdWait = (ms) => new Promise((r) => setTimeout(r, ms));
+  function bdSync() {                                         // BD.shown = to, co klapky opravdu ukazují; rozpracované překlopení se zahodí
+    if (!BD.built) return;
+    const rows = $('bdRows').children;
+    BD.shown = Array.from(rows, (row) => Array.from(row.children, (grp) => Array.from(grp.children, (cell) => {
+      for (const a of cell.getAnimations({ subtree: true })) a.cancel();
+      const c = cell.dataset.c || ' ';
+      for (const h of cell.children) bdSet(h, c);
+      cell.children[2].style.visibility = cell.children[3].style.visibility = 'hidden';
+      return c;
+    }).join('')));
+  }
   async function bdStep(cell, ch, run) {                      // jedno překlopení: horní půlka s dosavadním znakem padá dolů, spodní s novým znakem se za ní zaklapne
+    if (run !== BD.run) return false;
     const [t, bt, ft, fb] = cell.children, cur = cell.dataset.c;
+    const play = async (el, keys, o) => { try { await el.animate(keys, { ...o, fill: 'forwards' }).finished; return true; } catch { return false; } };   // zrušená animace (zavření tabule) = konec kroku
     bdSet(t, ch); bdSet(ft, cur); bdSet(fb, ch);
     ft.style.visibility = 'visible';
-    await ft.animate([{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(-90deg)' }], { duration: BD_STEP * 0.45, easing: 'ease-in', fill: 'forwards' }).finished;
+    if (!(await play(ft, [{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(-90deg)' }], { duration: BD_STEP * 0.45, easing: 'ease-in' })) || run !== BD.run) return false;
     ft.style.visibility = 'hidden'; fb.style.visibility = 'visible';
-    await fb.animate([{ transform: 'rotateX(90deg)' }, { transform: 'rotateX(0deg)' }], { duration: BD_STEP * 0.55, easing: 'ease-out', fill: 'forwards' }).finished;
+    if (!(await play(fb, [{ transform: 'rotateX(90deg)' }, { transform: 'rotateX(0deg)' }], { duration: BD_STEP * 0.55, easing: 'ease-out' })) || run !== BD.run) return false;
     bdSet(bt, ch); fb.style.visibility = 'hidden'; cell.dataset.c = ch;
-    return run === BD.run;
+    return true;
   }
   async function bdFlip(cell, to, run) {                      // klapka prochází znaky po pořadí abecedy až na cílový (dlouhá cesta se zkrátí)
     const cur = cell.dataset.c;
@@ -1990,11 +2003,11 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   function bdOpen() {
     if (!MHD.names || !MHD.trips || BD.open) return;
     if (!BD.built) bdBuild();
-    closeCard(); BD.open = true; $('board').hidden = false;
+    closeCard(); BD.run++; bdSync(); BD.open = true; $('board').hidden = false;   // srovnat s tím, co klapky skutečně ukazují (zavření během animace)
     BD.busy = false; bdApply(bdData(), 220);                  // otevření: řádky naskakují jeden po druhém
     clearInterval(BD.timer); BD.timer = setInterval(bdTick, 1000); bdTick();
   }
-  function bdClose(user) { BD.open = false; BD.run++; BD.busy = false; $('board').hidden = true; clearInterval(BD.timer); if (user) BD.auto = false; }
+  function bdClose(user) { BD.open = false; BD.run++; BD.busy = false; $('board').hidden = true; clearInterval(BD.timer); bdSync(); if (user) BD.auto = false; }
   $('bdClose').addEventListener('click', () => bdClose(true));
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && BD.open) bdClose(true); });
   function bdWatch() {                                        // přiblížení k nádraží otevře tabuli; po zavření se znovu otevře až po odjezdu od nádraží a návratu

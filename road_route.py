@@ -121,7 +121,7 @@ class Graph:
                 if d + w < dist.get(v, 1e18): dist[v] = d + w; prev[v] = u; heapq.heappush(q, (d + w, v))
         return {u: dist[u] for u in dst if u not in left}, prev
 
-    def path(self, stops, cor=()):
+    def path(self, stops, cor=(), exact=None, smer=None):
         """lomená čára přes zastávky [(x, y)] a vzdálenost každé zastávky po ní; self.legs = uzly úseků (None = rovně)"""
         self._cor = list(cor)
         near = [self.cands(p) for p in stops]
@@ -130,13 +130,32 @@ class Graph:
         S = set().union(*[c for c, fa in self._cor if fa <= 0.3]) if self._cor else set()
         if S:
             for i, p in enumerate(stops):
-                d = np.hypot(self.arr[:, 0] - p[0], self.arr[:, 1] - p[1])
+                if exact and exact[i]: continue             # přesná poloha zastávky (OSM): nejbližší uzly na jejím pásu; relace OSM často vede jen jedním pásem rozdělené silnice
+                d = np.hypot(self.arr[:, 0] - p[0], self.arr[:, 1] - p[1])   # (linka 24 u Lipek: zastávky se přichytily k pásu opačného směru a trasa objížděla křižovatku)
                 ok = [int(k) for k in np.flatnonzero(d <= 150) if int(k) in S]
                 if ok:
                     dm = min(d[k] for k in ok)
                     near[i] = {k: float(d[k]) for k in sorted(ok, key=lambda k: d[k])[:60] if d[k] <= dm + CAND}
         cand = [c if c or not any(q for q in near[max(i - 1, 0):i + 2]) else self.cands(stops[i], True)
                 for i, c in enumerate(near)]
+        if smer:                                            # zastávka na rozdělené silnici: kandidáti jen z pásu, kde se smí jet ve směru spoje (jinak objížďka a otočka).
+            for i, c in enumerate(cand):                    # K uzlům koridoru se přidají uzly do 40 m od zastávky: relace OSM často vede jen jedním pásem
+                if not smer[i] or not c: continue
+                n = float(np.hypot(*smer[i])); ok = {}
+                pool = dict(c)
+                if not (exact and exact[i]):
+                    d_ = np.hypot(self.arr[:, 0] - stops[i][0], self.arr[:, 1] - stops[i][1])
+                    for k in np.flatnonzero(d_ <= 40): pool.setdefault(int(k), float(d_[k]))
+                sc = {}
+                for u, dd in pool.items():
+                    best = -1.0
+                    for v, _w in self.adj[u]:
+                        e = (self.xy[v][0] - self.xy[u][0], self.xy[v][1] - self.xy[u][1]); le = float(np.hypot(*e))
+                        if le > 0.5: best = max(best, (e[0] * smer[i][0] + e[1] * smer[i][1]) / (le * n))
+                    sc[u] = best
+                if min(sc.values()) >= -0.3: continue         # žádný jednosměrný pás opačného směru poblíž (obyčejná silnice, zatáčka): nic se nemění
+                ok = {u: pool[u] for u, b_ in sc.items() if b_ > 0.3}
+                if ok: cand[i] = ok
         # Viterbi: pro každou zastávku ceny dosažených kandidátů a zpětné ukazatele (předchůdci z Dijkstry daného úseku)
         legs = []                                           # [(best {uzel: cena}, prev, src)] pro úseky 1..n-1
         best = {u: SNAP_W * d for u, d in cand[0].items()}

@@ -95,15 +95,42 @@ if 'shapes.txt' not in zf.namelist():                      # GTFS bez tvarů tra
     for _n, _la, _lo in REF.get('zastavky', []): _oz.setdefault(_n, []).append(tuple(float(v) for v in to_local(_lo, _la)))
     _mesto0 = MESTO.get('nazev', '') + ', '
 
-    def poloha(z, c):
+    def _smer_pasu(q, smer):
+        """největší shoda (cos) směru spoje s hranami vycházejícími z nejbližšího uzlu grafu; na jednosměrném pásu opačného směru vychází záporně"""
+        d = np.hypot(R.arr[:, 0] - q[0], R.arr[:, 1] - q[1]); u = int(d.argmin())
+        if d[u] > 25: return 1.0                              # daleko od silnice: nerozhoduje
+        n = math.hypot(*smer); best = -1.0
+        for v, _w in R.adj[u]:
+            e = (R.xy[v][0] - R.xy[u][0], R.xy[v][1] - R.xy[u][1]); le = math.hypot(*e)
+            if le > 0.5: best = max(best, (e[0] * smer[0] + e[1] * smer[1]) / (le * n))
+        return best
+
+    def poloha(z, c, smer=None):
         p = SXY[z]; n = SN.get(z, '')
         n = n[len(_mesto0):] if n.startswith(_mesto0) else n
         alts = [q for q in _oz.get(n, []) + _oz.get(n.split(', ')[-1], []) if math.dist(q, p) < 500]
         for g, lim in ((c['og'], 30.0), (c['mg'], 45.0)):
             if g is None or not alts: continue
-            d, q = min((g.distance(shapely.Point(q)), q) for q in alts)
-            if d <= lim and g.distance(shapely.Point(p)) > d: return q
+            ds = [(g.distance(shapely.Point(q)), q) for q in alts]
+            d, q = min(ds)
+            if d <= lim and g.distance(shapely.Point(p)) > d:
+                if smer is not None:                      # protější zastávky rozdělené silnice (oba pásy jsou v koridoru): ta na pásu, kde se smí jet ve směru spoje,
+                    bl = [qq for dd, qq in ds if dd <= lim and math.dist(qq, q) < 200]   # jinak trasa zajede na pás opačného směru a vrací se (otočka u zastávky)
+                    if len(bl) > 1:
+                        ok = [qq for qq in bl if _smer_pasu(qq, smer) > 0.3]
+                        if ok: q = min(ok, key=lambda a: math.dist(a, q))
+                return q
         return p
+
+    SMER_ON = os.environ.get('IZO_STOP_SMER', '1') != '0'      # 0 = bez výběru zastávky podle směru jízdy (porovnání se starým chováním)
+
+    def smery(zs):                                        # směr jízdy u každé zastávky spoje: z předchozí do následující (podle souřadnic jízdního řádu)
+        if not SMER_ON: return [None] * len(zs)
+        out = []
+        for i, z in enumerate(zs):
+            a = SXY[zs[i - 1]] if i else SXY[z]; b = SXY[zs[i + 1]] if i + 1 < len(zs) else SXY[z]
+            d = (b[0] - a[0], b[1] - a[1]); out.append(d if math.hypot(*d) > 20 and 0 < i < len(zs) - 1 else None)   # konečné: směr nejistý (otáčení, smyčky)
+        return out
 
     def kvalita(c, legs, pts):
         """kód úseku: j jistý (OSM i město, nebo ručně), o jen OSM, m jen město, r rozpor OSM × město, n nejistý, x mimo mapu"""
@@ -133,8 +160,8 @@ if 'shapes.txt' not in zf.namelist():                      # GTFS bez tvarů tra
         ln = RT[t['route_id']]['route_short_name']
         key = (ln, tuple(z[4] for z in s))
         if key not in syn:
-            c = koridory(ln); pts_ = [poloha(z, c) for z in key[1]]
-            line, dists = R.path(pts_, cor=[(c['u'], 0.1), (c['o'], 0.3), (c['m'], 0.65)])
+            c = koridory(ln); pts_ = [poloha(z, c, sm) for z, sm in zip(key[1], smery(key[1]))]
+            line, dists = R.path(pts_, cor=[(c['u'], 0.1), (c['o'], 0.3), (c['m'], 0.65)], exact=[tuple(q) != tuple(SXY[z]) for q, z in zip(pts_, key[1])], smer=smery(key[1]))
             KVAL[len(shapes)] = (kvalita(c, R.legs, pts_), dists)
             syn[key] = (f'syn{len(shapes)}', dists)
             SI[syn[key][0]] = len(shapes); SLEN[syn[key][0]] = (dists[-1] or 1.0, dists[-1] or 1.0)

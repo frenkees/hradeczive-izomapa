@@ -127,25 +127,30 @@ a.soc:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 rgba(0, 0, 
 .card dl.dep dd { color: var(--muted); }
 .card .tm { white-space: nowrap; }
 .card .tm + .tm::before { content: ''; }
-/* odjezdová tabule: mechanická tabule s klapkami (každé písmeno je klapka, která se přelistuje) ve stylu SimCity 2000 */
+/* odjezdová tabule: mechanická tabule s klapkami (Solari); každé písmeno jsou dvě půlky, které se překlápí */
 .board { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
-  width: min(440px, calc(100vw - 24px)); background: #15181d; border: 3px solid #4a4f58; box-shadow: 4px 4px 0 rgba(0, 0, 0, .45), inset 0 0 0 2px #0b0c0f;
-  padding: 8px 10px 6px; font-family: var(--display); color: #ffd24a; --fs: min(12.4px, calc((100vw - 114px) / 27.2)); }
+  width: min(640px, calc(100vw - 24px)); background: #101216; border: 3px solid #4a4f58; box-shadow: 4px 4px 0 rgba(0, 0, 0, .45), inset 0 0 0 2px #07080a;
+  padding: 10px 12px 8px; font-family: "Atkinson Hyperlegible", system-ui, sans-serif; color: #f4efd8; --fs: min(19px, calc((100vw - 120px) / 26.6)); }
 .board[hidden] { display: none; }
-.bd-head { display: flex; align-items: center; gap: 10px; padding: 0 34px 6px 0; position: relative; font-size: calc(var(--fs) * .95); letter-spacing: .06em; color: #e8e8e2; }
-.bd-head .bd-clock { margin-left: auto; color: #ffd24a; font-variant-numeric: tabular-nums; }
-.bd-head .close { position: absolute; top: -4px; right: -4px; width: 30px; height: 30px; padding: 0; }
-.bd-row { display: flex; gap: calc(var(--fs) * .7); margin-top: 4px; }
+.bd-head { display: flex; align-items: center; gap: 10px; padding: 0 38px 8px 0; position: relative; font-family: var(--display); font-size: calc(var(--fs) * .95); letter-spacing: .06em; color: #e8e8e2; }
+.bd-head .bd-clock { margin-left: auto; color: #ffd24a; font-variant-numeric: tabular-nums; font-size: calc(var(--fs) * 1.15); }
+.bd-head .close { position: absolute; top: -4px; right: -4px; width: 32px; height: 32px; padding: 0; }
+.bd-row { display: flex; gap: calc(var(--fs) * .85); margin-top: 5px; }
 .bd-grp { display: flex; gap: 2px; }
-.fl { position: relative; display: inline-block; width: calc(var(--fs) * .78); height: calc(var(--fs) * 1.45); line-height: calc(var(--fs) * 1.45); text-align: center;
-  background: linear-gradient(#24272d 0 49%, #101215 51% 100%); color: #ffd24a; font-size: var(--fs); font-weight: 600; border-radius: 2px; overflow: hidden;
-  box-shadow: inset 0 0 0 1px #0a0b0d; text-shadow: 0 0 .35em rgba(255, 210, 74, .35); }
-.fl::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: #050506; box-shadow: 0 1px 0 rgba(255, 255, 255, .06); }
-.fl.fp { animation: flap .07s steps(2) 1; }
-@keyframes flap { 0% { transform: scaleY(1); } 50% { transform: scaleY(.55); filter: brightness(.7); } 100% { transform: scaleY(1); } }
-.bd-foot { margin-top: 6px; font-size: calc(var(--fs) * .62); color: #8e939c; letter-spacing: .03em; }
+.fl { position: relative; display: inline-block; width: calc(var(--fs) * .84); height: calc(var(--fs) * 1.8); perspective: calc(var(--fs) * 14); }
+.fl .h { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; display: block; font-style: normal; }
+.fl .t, .fl .ft { top: 0; border-radius: 3px 3px 0 0; background: linear-gradient(#34373d, #202226); }
+.fl .bt, .fl .fb { top: 50%; border-radius: 0 0 3px 3px; background: linear-gradient(#18191c, #0d0e10); }
+.fl .ft { transform-origin: 50% 100%; backface-visibility: hidden; visibility: hidden; z-index: 3; }
+.fl .fb { transform-origin: 50% 0; backface-visibility: hidden; visibility: hidden; z-index: 3; }
+.fl b { position: absolute; left: 0; right: 0; height: calc(var(--fs) * 1.8); line-height: calc(var(--fs) * 1.8); text-align: center; font-weight: 700; font-size: calc(var(--fs) * 1.28);
+  color: #f6f0d9; text-shadow: 0 1px 0 rgba(0, 0, 0, .6); }
+.fl .t b, .fl .ft b { top: 0; }
+.fl .bt b, .fl .fb b { top: calc(var(--fs) * -0.9); }
+.fl::after { content: ''; position: absolute; left: 0; right: 0; top: calc(50% - 1px); height: 2px; background: #040405; z-index: 4; box-shadow: 0 1px 0 rgba(255, 255, 255, .07); }
+.fl::before { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px #050506; border-radius: 3px; z-index: 5; pointer-events: none; }
+.bd-foot { margin-top: 8px; font-size: calc(var(--fs) * .62); color: #8e939c; letter-spacing: .03em; }
 @media (max-width: 640px) { .board { bottom: calc(env(safe-area-inset-bottom, 0px) + 70px); } }
-@media (prefers-reduced-motion: reduce) { .fl.fp { animation: none; } }
 .card p { margin: 0; font-size: .86rem; line-height: 1.45; }
 .card .close { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; padding: 0; }
 .head { flex-wrap: wrap; row-gap: 0; }
@@ -1884,12 +1889,25 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     showCard({ title: `Zastávka ${MHD.names[s.n]}`, text: rows.length ? 'Odjezdy podle jízdního řádu, bez zpoždění.' : 'V příští hodině odtud podle jízdního řádu nic nejede.',
       rows, dep: true, lon: s.x / cam.kx + cam.lon0, lat: s.y / cam.ky + cam.lat0 });
   }
-  // hlavní nádraží: odjezdová tabule s klapkami. Řádky = nejbližší odjezdy podle jízdního řádu; první odjíždějící je nahoře. Jakmile odjede, tabule se
-  // po řádcích přelistuje (každé písmeno prochází abecedu jako mechanická klapka). Otevře ji klik na budovu nádraží nebo přiblížení k nádraží.
+  // hlavní nádraží: odjezdová tabule s klapkami (Solari). Řádky = nejbližší odjezdy podle jízdního řádu; první odjíždějící je nahoře. Jakmile odjede, tabule se
+  // přepisuje řádek po řádku: každé písmeno je klapka ze dvou půlek, která se opravdu překlápí a prochází abecedu až na cílový znak.
+  // Otevře ji klik na budovu nádraží nebo přiblížení k nádraží.
   const STANICE = { lat: 50.214528, lon: 15.810767, re: /^Hradec Králové,? hlavní nádraží/i, nazev: 'Hlavní nádraží' };   // městský údaj (budova dominanty Hlavní nádraží)
-  const BD = { n: 7, w: [5, 8, 17, 2], shown: null, busy: false, timer: 0, ids: null, auto: true, open: false, built: false };
+  const BD = { n: 7, w: [5, 8, 15, 2], shown: null, busy: false, timer: 0, ids: null, auto: true, open: false, built: false, run: 0 };
+  const BD_STEP = 120, BD_MAX = 14, BD_ROW_PAUSE = 450;       // ms na jedno překlopení znaku, nejvýš kroků na znak, pauza mezi řádky
   const BD_CH = ' ABCDEFGHIJKLMNOPQRSTUVWXYZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ0123456789.-/:';
   const bdRed = matchMedia('(prefers-reduced-motion: reduce)');
+  const BD_ZK = [[/ hlavní nádraží/i, ' hl.n.'], [/ nad Kněžnou/i, ' n.K.'], [/ nad Labem/i, ' n.L.'], [/ nad Orlicí/i, ' n.O.'], [/ nad Metují/i, ' n.M.'], [/ nad Cidlinou/i, ' n.C.'],
+    [/nádraží/i, 'nádr.'], [/Slezské Předměstí/i, 'Slez.Předm.'], [/,\s*/g, ' ']];
+  function bdSkrat(s, w) {                                    // dlouhý název se zkracuje (Rychnov nad Kněžnou -> Rychnov n.K.), ať se vejde do w znaků
+    s = s.replace(/^Hradec Králové,? /, '');
+    for (const [re, to] of BD_ZK) s = s.replace(re, to);
+    if (s.length <= w) return s;
+    let p = s.split(/\s+/).filter((x) => !/^(nad|pod|u|na|v|ve|při)$/i.test(x));
+    s = p.join(' '); if (s.length <= w) return s;
+    p = p.map((x, i) => (i > 0 && i < p.length - 1 && x.length > 4 ? x.slice(0, 3) + '.' : x)); s = p.join(' '); if (s.length <= w) return s;
+    return p.map((x, i) => (i < p.length - 1 && x.length > 3 ? x.slice(0, 3) + '.' : x)).join(' ').slice(0, w);
+  }
   const bdStr = (s, w) => { s = String(s).toUpperCase().replace(/[^ A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ0-9.\-/:]/g, ''); return (s.length > w ? s.slice(0, w) : s).padEnd(w, ' '); };
   function bdIds() {
     if (!BD.ids) { BD.ids = new Set(); MHD.names.forEach((n, i) => { if (STANICE.re.test(n)) BD.ids.add(i); }); }
@@ -1902,63 +1920,81 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       if (dt <= 0) continue;                                  // už odjel
       const z = t[6]; let kol = '';
       for (let k = 0; k < z.length - 2; k += 2) if (ids.has(z[k])) { const m = /kolej (\w+)/.exec(MHD.names[z[k]]); if (m) kol = m[1]; break; }
-      const pr = MHD.routes[t[0]][0].split(' '), dest = MHD.names[t[5]].replace(/^Hradec Králové,? /, '');
-      out.push([bdStr(hm(dt), BD.w[0]), bdStr(`${pr[0]} ${pr[pr.length - 1]}`, BD.w[1]), bdStr(dest, BD.w[2]), bdStr(kol, BD.w[3])]);
+      const pr = MHD.routes[t[0]][0].split(' ');
+      out.push([bdStr(hm(dt), BD.w[0]), bdStr(`${pr[0]} ${pr[pr.length - 1]}`, BD.w[1]), bdStr(bdSkrat(MHD.names[t[5]], BD.w[2]), BD.w[2]), bdStr(kol, BD.w[3])]);
       if (out.length >= BD.n) break;
     }
     while (out.length < BD.n) out.push(BD.w.map((w) => ' '.repeat(w)));
     return out;
   }
+  const bdSet = (h, ch) => { h.firstChild.textContent = ch; };
   function bdBuild() {
     const rows = $('bdRows'); rows.replaceChildren();
     for (let r = 0; r < BD.n; r++) {
       const row = document.createElement('div'); row.className = 'bd-row'; row.setAttribute('role', 'row');
-      BD.w.forEach((w, g) => { const grp = document.createElement('div'); grp.className = 'bd-grp g-' + 'tnds'[g]; for (let c = 0; c < w; c++) { const f = document.createElement('span'); f.className = 'fl'; f.textContent = ' '; grp.append(f); } row.append(grp); });
+      BD.w.forEach((w, g) => {
+        const grp = document.createElement('div'); grp.className = 'bd-grp';
+        for (let c = 0; c < w; c++) {
+          const f = document.createElement('span'); f.className = 'fl'; f.dataset.c = ' ';
+          f.innerHTML = '<i class="h t"><b> </b></i><i class="h bt"><b> </b></i><i class="h ft"><b> </b></i><i class="h fb"><b> </b></i>';
+          grp.append(f);
+        }
+        row.append(grp);
+      });
       rows.append(row);
     }
     BD.built = true; BD.shown = Array.from({ length: BD.n }, () => BD.w.map((w) => ' '.repeat(w)));
   }
-  function bdFlip(cell, to, delay) {                          // přelistuje klapku z aktuálního znaku na cílový (prochází abecedu po pořadí)
-    const cur = cell.textContent || ' ';
-    if (cur === to) return;
-    setTimeout(() => {
-      let a = Math.max(0, BD_CH.indexOf(cur)); const b = Math.max(0, BD_CH.indexOf(to));
-      const steps = ((b - a + BD_CH.length) % BD_CH.length) || BD_CH.length;
-      if (bdRed.matches) { cell.textContent = to; return; }
-      const k = Math.max(0, steps - 16); let n = 0;           // dlouhé cesty se zkrátí: klapka by rolovala příliš dlouho
-      a = (a + k) % BD_CH.length;
-      const tick = () => {
-        a = (a + 1) % BD_CH.length; cell.textContent = BD_CH[a]; cell.classList.remove('fp'); void cell.offsetWidth; cell.classList.add('fp');
-        if (++n < steps - k) setTimeout(tick, 38 + Math.random() * 28); else cell.textContent = to;
-      };
-      tick();
-    }, delay);
+  const bdWait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function bdStep(cell, ch, run) {                      // jedno překlopení: horní půlka s dosavadním znakem padá dolů, spodní s novým znakem se za ní zaklapne
+    const [t, bt, ft, fb] = cell.children, cur = cell.dataset.c;
+    bdSet(t, ch); bdSet(ft, cur); bdSet(fb, ch);
+    ft.style.visibility = 'visible';
+    await ft.animate([{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(-90deg)' }], { duration: BD_STEP * 0.45, easing: 'ease-in', fill: 'forwards' }).finished;
+    ft.style.visibility = 'hidden'; fb.style.visibility = 'visible';
+    await fb.animate([{ transform: 'rotateX(90deg)' }, { transform: 'rotateX(0deg)' }], { duration: BD_STEP * 0.55, easing: 'ease-out', fill: 'forwards' }).finished;
+    bdSet(bt, ch); fb.style.visibility = 'hidden'; cell.dataset.c = ch;
+    return run === BD.run;
   }
-  function bdApply(data, stagger) {                           // přepíše jen řádky, které se změnily; řádky po jednom se zpožděním
-    const rows = $('bdRows').children; let d = 0, last = 0;
-    data.forEach((row, r) => {
-      if (row.join('|') === BD.shown[r].join('|')) return;
-      row.forEach((s, g) => { const cells = rows[r].children[g].children; for (let c = 0; c < s.length; c++) bdFlip(cells[c], s[c], d + c * 18 + g * 40); });
-      d += stagger; last = d;
-    });
+  async function bdFlip(cell, to, run) {                      // klapka prochází znaky po pořadí abecedy až na cílový (dlouhá cesta se zkrátí)
+    const cur = cell.dataset.c;
+    if (cur === to) return;
+    if (bdRed.matches) { for (const h of cell.children) bdSet(h, to); cell.dataset.c = to; return; }
+    let a = Math.max(0, BD_CH.indexOf(cur)); const b = Math.max(0, BD_CH.indexOf(to));
+    const steps = ((b - a + BD_CH.length) % BD_CH.length) || BD_CH.length, k = Math.max(0, steps - BD_MAX);
+    a = (a + k) % BD_CH.length;
+    if (k) for (const h of [cell.children[0], cell.children[1]]) bdSet(h, BD_CH[a]), cell.dataset.c = BD_CH[a];
+    for (let n = k; n < steps; n++) { a = (a + 1) % BD_CH.length; if (!(await bdStep(cell, BD_CH[a], run))) return; }
+  }
+  async function bdApply(data, pauza) {                       // přepisuje změněné řádky po jednom; v řádku se klapky překlápí zleva doprava s malým zpožděním
+    const run = ++BD.run; BD.busy = true;
+    const rows = $('bdRows').children, cur = BD.shown.map((r) => r.slice());
     BD.shown = data.map((r) => r.slice());
-    BD.busy = true; setTimeout(() => { BD.busy = false; }, last + 1800);
+    for (let r = 0; r < data.length; r++) {
+      if (data[r].join('|') === cur[r].join('|')) continue;
+      const jobs = []; let ci = 0;
+      data[r].forEach((s, g) => { const cells = rows[r].children[g].children; for (let c = 0; c < s.length; c++, ci++) jobs.push(bdWait(ci * 22).then(() => bdFlip(cells[c], s[c], run))); });
+      await Promise.all(jobs);
+      if (run !== BD.run || !BD.open) break;
+      await bdWait(pauza);
+    }
+    if (run === BD.run) BD.busy = false;
   }
   function bdTick() {
     if (!BD.open || document.hidden) return;
     const p = pragueNow(); $('bdClock').textContent = `${Math.floor(p.s / 3600)}:${String(Math.floor(p.s / 60) % 60).padStart(2, '0')}`;
     if (BD.busy) return;
     const data = bdData();
-    if (data.some((r, i) => r.join('|') !== BD.shown[i].join('|'))) bdApply(data, 520);   // první řádek odjel: tabule se přepisuje řádek po řádku
+    if (data.some((r, i) => r.join('|') !== BD.shown[i].join('|'))) bdApply(data, BD_ROW_PAUSE);   // první řádek odjel: tabule se přepisuje řádek po řádku
   }
   function bdOpen() {
     if (!MHD.names || !MHD.trips || BD.open) return;
     if (!BD.built) bdBuild();
     closeCard(); BD.open = true; $('board').hidden = false;
-    BD.busy = false; bdApply(bdData(), 170);                  // otevření: řádky naskakují jeden po druhém
+    BD.busy = false; bdApply(bdData(), 220);                  // otevření: řádky naskakují jeden po druhém
     clearInterval(BD.timer); BD.timer = setInterval(bdTick, 1000); bdTick();
   }
-  function bdClose(user) { BD.open = false; $('board').hidden = true; clearInterval(BD.timer); if (user) BD.auto = false; }
+  function bdClose(user) { BD.open = false; BD.run++; BD.busy = false; $('board').hidden = true; clearInterval(BD.timer); if (user) BD.auto = false; }
   $('bdClose').addEventListener('click', () => bdClose(true));
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && BD.open) bdClose(true); });
   function bdWatch() {                                        // přiblížení k nádraží otevře tabuli; po zavření se znovu otevře až po odjezdu od nádraží a návratu
@@ -1966,7 +2002,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const x = (STANICE.lon - cam.lon0) * cam.kx, y = (STANICE.lat - cam.lat0) * cam.ky, [ix, iy] = toImg(x, y, gz(x, y));
     const b = viewer.viewport.getBounds(true), cx = (b.x + b.width / 2) * W, cy = (b.y + b.height / 2) * W;
     const scr = viewer.viewport.getContainerSize().x / (b.width * W), blizko = scr >= 0.3 && Math.hypot(cx - ix, cy - iy) < 520;
-    BD.dbg = { scr, d: Math.hypot(cx - ix, cy - iy), ix, iy, cx, cy };
+    BD.dbg = { scr, d: Math.hypot(cx - ix, cy - iy) };
     if (blizko && !BD.open && BD.auto) bdOpen();
     else if (!blizko && (scr < 0.18 || Math.hypot(cx - ix, cy - iy) > 1400)) { if (BD.open) bdClose(false); BD.auto = true; }
   }

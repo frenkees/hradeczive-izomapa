@@ -732,6 +732,9 @@ if HOOK == 'props' and os.environ.get('IZO_ZNACKY', '1') != '0' and os.path.exis
         if z.get('win'): b['s'] = z['win']
         if b['r'] != 'flat' and q.area > 60: b['r'] = 'flat'; b['parts'] = []; b['rh'] = 0.0
         b.pop('ch', None); b.pop('dm', None)
+        hmin = {'market': 6.0, 'fast': 4.2, 'pumpa': 3.6}.get(z['druh'], 0)   # nesmyslně nízká výška z dat (laser na jiném místě)
+        if b['e'] - b['g'] < hmin - 1.5: b['e'] = round(b['g'] + hmin, 2)
+        zn['ph'] = round(min(zn['ph'], 0.4 * (b['e'] - b['g'])), 2)
         return zn
 
     # --- obchody a rychlé občerstvení ---
@@ -783,7 +786,8 @@ if HOOK == 'props' and os.environ.get('IZO_ZNACKY', '1') != '0' and os.path.exis
 
     # --- čerpací stanice ---
     _zdone = set()
-    for z, x, y in sorted(_zgas, key=lambda t: t[0] is None):                 # se značkou napřed (duplicitní místa téže pumpy)
+    _ZIDX = {z['id']: i for i, z in enumerate(_ZT['znacky'])}
+    for z, x, y in sorted(_zgas, key=lambda t: 999 if t[0] is None else _ZIDX[t[0]['id']]):   # se značkou napřed, v pořadí tabulky (Orlen před AS 24 na téže pumpě)
         bez = z is None; z = z or _ZN['pumpa']
         kc = None                                                              # stříška: největší do 35 m od bodu
         for i in _ztree.query(Point(x, y).buffer(35)):

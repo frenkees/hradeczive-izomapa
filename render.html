@@ -339,7 +339,7 @@ const roofMat = mat(/* glsl */`
 const solidMat = mat(/* glsl */`
   varying vec3 vC; varying vec3 vN; varying vec3 vW; varying vec4 vA;
   void main(){
-    if (uLights > 0.5) { gl_FragColor = vec4(vA.x > 0.5 ? vec3(1.0, 0.86, 0.6) * vA.x : vec3(0.0), 1.0); return; }
+    if (uLights > 0.5) { gl_FragColor = vec4(vA.x > 0.5 ? (vA.w > 0.5 ? vC * (0.5 + 0.6 * vA.x) : vec3(1.0, 0.86, 0.6) * vA.x) : vec3(0.0), 1.0); return; }   // aw.w = svítí vlastní barvou (cedule)
     vec3 n = fn(normalize(vN));
     vec3 col = vC;
     if (winter() && vA.z > 0.5 && n.y > 0.6) col = SNOW;

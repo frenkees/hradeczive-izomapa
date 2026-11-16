@@ -890,3 +890,301 @@ export function buildProps(P, { make, inst, F, pushBox, pushQuad, pushTri }) {
     inst(g, mine, (it) => [it[0], it[1], it[2], it[3]], null);
   });
 }
+
+// ---- Vizuální identita řetězců (assets/znacky.json, přiřazení v assets/custom_prep.py -> b.zn) ----
+// b.zn.m: 'cela' = celá budova v barvách značky (pás pod střechou po obvodu, nápis / cedule a vstup na průčelí f = [stěna, poloha]),
+//         'cast' = jednotky v budově s víc nájemci (seg: pás a nápis jen na úseku stěny, z = výška parteru u vysokých domů),
+//         'stris' = stříška čerpací stanice (barevné čelo, ostrůvky se stojany).
+// b.zn.pl = [x, y, z, úhel silnice, výška] pylon u vjezdu. Barvy 0–255. Zdi a střechu kreslí běžný kód (b.wc, b.rc).
+const ZN_GLASS = [0.26, 0.38, 0.48], ZN_GREY = [0.40, 0.42, 0.45], ZN_WHITE = [0.95, 0.95, 0.93], ZN_ASPH = [0.30, 0.30, 0.32];
+const ZN_FIX = [0, 1, 0, 0], ZN_GLOW = [0.75, 1, 0, 1], ZN_GL = [0.55, 1, 0, 0];   // ZN_GLOW: v noci svítí vlastní barvou (render.html, aw.w)
+const zc = (a) => (a ? [a[0] / 255, a[1] / 255, a[2] / 255] : null);
+const zdark = (c, k = 0.82) => c.map((q) => q * k);
+const tvZ = (x, y, z) => [x, z, -y];
+
+// písmo 3 × 5 bodů (řádky shora, bity zleva) pro nápisy na fasádách a cedulích
+const ZN_FONT = {
+  A: [2, 5, 7, 5, 5], B: [6, 5, 6, 5, 6], C: [3, 4, 4, 4, 3], D: [6, 5, 5, 5, 6], E: [7, 4, 6, 4, 7], F: [7, 4, 6, 4, 4], G: [3, 4, 5, 5, 3],
+  H: [5, 5, 7, 5, 5], I: [7, 2, 2, 2, 7], J: [1, 1, 1, 5, 2], K: [5, 5, 6, 5, 5], L: [4, 4, 4, 4, 7], M: [5, 7, 7, 5, 5], N: [6, 5, 5, 5, 5],
+  O: [2, 5, 5, 5, 2], P: [6, 5, 6, 4, 4], Q: [2, 5, 5, 6, 3], R: [6, 5, 6, 5, 5], S: [3, 4, 2, 1, 6], T: [7, 2, 2, 2, 2], U: [5, 5, 5, 5, 7],
+  V: [5, 5, 5, 5, 2], W: [5, 5, 7, 7, 5], X: [5, 5, 2, 5, 5], Y: [5, 5, 2, 2, 2], Z: [7, 1, 2, 4, 7], 2: [6, 1, 2, 4, 7], 4: [5, 5, 7, 1, 1], ' ': [0, 0, 0, 0, 0],
+};
+// nápis: střed sc podél s, čelo t (záporné = před stěnou), spodní hrana z0, výška písmen h (zmenší se na šířku maxW); vrací šířku
+function znText(X, pushBox, f, sc, t, z0, h, maxW, text, col, aw = ZN_GLOW) {
+  const n = text.length, cells = n * 4 - 1;
+  const cell = Math.min(h / 5, maxW / cells), w = cell * cells, s0 = sc - w / 2;
+  for (let k = 0; k < n; k++) {
+    const g = ZN_FONT[text[k]] || ZN_FONT[' '];
+    for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++) {
+      if (!(g[r] & (4 >> c))) continue;
+      const s = s0 + (k * 4 + c) * cell, z = z0 + (4 - r) * cell;
+      pushBox(X, f, s, s + cell * 1.02, t - 0.06, t + 0.02, z, z + cell * 1.02, col, aw);
+    }
+  }
+  return w;
+}
+
+// stěna i obrysu: rámec s počátkem v prvním bodě (s podél stěny, t > 0 dovnitř budovy – obrys je proti směru hodin)
+function znEdge(ring, i, frameAt) {
+  const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % ring.length];
+  return { f: frameAt(x0, y0, 0, Math.atan2(y1 - y0, x1 - x0)), L: Math.hypot(x1 - x0, y1 - y0), ang: Math.atan2(y1 - y0, x1 - x0), x0, y0 };
+}
+
+// cedule s logem: rámeček, podklad, znak (čtverec uprostřed), na čele t0 (záporné = před stěnou), svítí v noci
+function znSign(X, pushBox, f, s, t0, z0, z1, w, lg, both = false) {
+  const bg = zc(lg[0]), fg = zc(lg[1]), rm = zc(lg[2]), h = z1 - z0, zm = (z0 + z1) / 2;
+  const tt = both ? [-t0, t0] : [t0 - 0.05, t0 + 0.3];
+  if (rm) pushBox(X, f, s - w / 2 - 0.22, s + w / 2 + 0.22, tt[0] + 0.06, tt[1] - 0.06, z0 - 0.22, z1 + 0.22, rm, ZN_GLOW);
+  pushBox(X, f, s - w / 2, s + w / 2, tt[0], tt[1], z0, z1, bg, ZN_GLOW, zdark(bg, 0.9));
+  const fw = Math.min(w * 0.6, h * 0.62) / 2, fh = Math.min(h * 0.3, w * 0.3);
+  pushBox(X, f, s - fw, s + fw, tt[0] - 0.06, both ? tt[1] + 0.06 : tt[0] + 0.02, zm - fh, zm + fh, fg, ZN_GLOW);
+}
+
+// žluté oblouky „M“ (s podél, výška z0..z1, tloušťka t0..t1)
+function znArches(X, pushBox, f, s0, w, z0, z1, t0, t1, col) {
+  const r = w / 4, zc_ = z1 - r, th = Math.max(0.14, w * 0.08);
+  for (const sx of [s0 - r, s0 + r]) {
+    for (let k = 0; k < 7; k++) {
+      const a = Math.PI * k / 6, ss = sx - Math.cos(a) * r, zz = zc_ + Math.sin(a) * r;
+      pushBox(X, f, ss - th, ss + th, t0, t1, zz - th, zz + th, col, ZN_GLOW);
+    }
+  }
+  for (const [ss, top] of [[s0 - 2 * r, zc_], [s0, zc_ - 0.15 * r], [s0 + 2 * r, zc_]]) pushBox(X, f, ss - th, ss + th, t0, t1, z0, top, col, ZN_GLOW);
+}
+
+function znPylon(X, pushBox, pl, zn) {
+  const [x, y, g, a, H] = pl, f = (s, t, h) => tvZ(x + Math.cos(a) * s - Math.sin(a) * t, y + Math.sin(a) * s + Math.cos(a) * t, h);
+  const pas = zc(zn.pas);
+  if (zn.k === 'mcdonalds') {                                   // vysoký sloup se žlutým M na červeném panelu
+    pushBox(X, f, -0.3, 0.3, -0.3, 0.3, g - 0.3, g + H - 3.0, ZN_GREY, ZN_FIX);
+    pushBox(X, f, -1.8, 1.8, -0.25, 0.25, g + H - 3.5, g + H, zc([200, 20, 24]), ZN_GLOW);
+    znArches(X, pushBox, f, 0, 3.0, g + H - 3.2, g + H - 0.3, -0.32, 0.32, zc([255, 199, 44]));
+    return;
+  }
+  if (zn.m === 'stris' || zn.pumpa) {                           // pylon s cenami: logo nahoře, pod ním tabule s cenami
+    pushBox(X, f, -1.1, 1.1, -0.3, 0.3, g - 0.3, g + H, [0.16, 0.18, 0.22], ZN_FIX, pas);
+    znSign(X, pushBox, f, 0, 0.36, g + H - 2.0, g + H - 0.1, 2.2, zn.lg, true);
+    for (let r = 0; r < 3; r++) {
+      const z = g + H - 2.6 - r * 0.85;
+      pushBox(X, f, -0.85, 0.85, -0.36, 0.36, z - 0.32, z + 0.12, [0.96, 0.92, 0.70], [0.9, 1, 0, 0]);
+    }
+    pushBox(X, f, -1.12, 1.12, -0.34, 0.34, g + 0.6, g + 1.0, pas, ZN_FIX);
+    return;
+  }
+  // obchod: dva sloupky a velký panel s logem (podklad, rámeček, znak) na obou stranách
+  const pw = Math.max(2.6, H * 0.34), ph = Math.min(H * 0.42, 3.8);
+  for (const s of [-pw * 0.32, pw * 0.32]) pushBox(X, f, s - 0.18, s + 0.18, -0.18, 0.18, g - 0.3, g + H - ph, ZN_GREY, ZN_FIX);
+  znSign(X, pushBox, f, 0, 0.4, g + H - ph, g + H, pw, zn.lg, true);
+  if (zn.k === 'kfc') for (let k = 0; k < 6; k++) pushBox(X, f, -pw / 2 + k * pw / 6, -pw / 2 + (k + 0.5) * pw / 6, -0.42, 0.42, g + H - ph - 0.6, g + H - ph, k % 2 ? ZN_WHITE : zc([200, 16, 46]), ZN_FIX);
+}
+
+// pás pod střechou na úseku stěny s0..s1 (z0..z1), volitelně tenký proužek p2 pod ním; KFC = svislé červenobílé pruhy
+function znBand(X, pushBox, E, s0, s1, z0, z1, pas, p2, kfc) {
+  if (s1 - s0 < 0.3) return;
+  if (kfc) {
+    const n = Math.max(1, Math.round((s1 - s0) / 1.3));
+    for (let k = 0; k < n; k++) pushBox(X, E.f, s0 + (s1 - s0) * k / n, s0 + (s1 - s0) * (k + 1) / n, -0.24, 0.1, z0, z1, k % 2 ? ZN_WHITE : pas, ZN_FIX);
+  } else pushBox(X, E.f, s0, s1, -0.24, 0.1, z0, z1, pas, [0.2, 1, 0, 0], zdark(pas, 0.9));
+  if (p2) pushBox(X, E.f, s0, s1, -0.2, 0.05, z0 - 0.45, z0 - 0.08, p2, [0.2, 1, 0, 0]);
+}
+
+landmarks.znacka = function (b, { X, R, frameAt, pushBox, pushQuad }) {
+  const zn = b.zn; if (!zn) return false;
+  const ring = b.p, g = b.g, e = b.e;
+  if (zn.seg) {                                                  // jednotky s vlastním pásem (i nájemci v parteru hypermarketu)
+    for (const sg of zn.seg) {
+      const [i, s0, s1] = sg.e, E = znEdge(ring, i, frameAt), pas = zc(sg.pas), p2 = zc(sg.p2), sm = (s0 + s1) / 2, w = s1 - s0;
+      const za = sg.z ? g + sg.z : e - sg.ph, zb = sg.z ? g + sg.z + Math.min(sg.ph, 1.2) : e + 0.45;
+      znBand(X, pushBox, E, s0, s1, za, zb, pas, p2, sg.k === 'kfc');
+      if (sg.txt) znText(X, pushBox, E.f, sm, -0.3, za + (zb - za) * 0.16, (zb - za) * 0.68, w * 0.9, sg.txt, zc(sg.tc));
+      else znSign(X, pushBox, E.f, sm, -0.55, za - 0.15, zb + (sg.z ? 0.2 : 1.0), Math.min(sg.z ? 2.6 : 5.0, Math.max(2.4, w * 0.3)), sg.lg);
+    }
+    if (zn.m === 'cast') return true;
+  }
+  const pas = zc(zn.pas), p2 = zc(zn.p2), ph = zn.ph;
+  if (zn.m === 'stris') {                                        // stříška čerpací stanice
+    for (let i = 0; i < ring.length; i++) {
+      const E = znEdge(ring, i, frameAt); if (E.L < 0.3) continue;
+      pushBox(X, E.f, -0.05, E.L + 0.05, -0.28, 0.05, e - ph, e + 0.18, pas, [0.7, 1, 0, 1], zdark(pas, 0.9));
+      if (p2) pushBox(X, E.f, -0.05, E.L + 0.05, -0.32, -0.26, e - ph, e - ph + 0.32, p2, [0.7, 1, 0, 1]);
+      if (zn.txt && E.L > 8 && Math.sin(E.ang) < 0.5 && -Math.cos(E.ang) < 0.5 && Math.abs(Math.sin(E.ang)) + Math.abs(Math.cos(E.ang)) > 0)
+        znText(X, pushBox, E.f, E.L / 2, -0.32, e - ph * 0.85, ph * 0.7, E.L * 0.5, zn.txt, zc(zn.tc));
+    }
+    const F = frame2(ring), sl = F.s1 - F.s0, tl = F.t1 - F.t0;
+    const rows = tl > 13 ? [0.3, 0.7] : [0.5], n = Math.max(1, Math.min(4, Math.round((sl - 2) / 8)));
+    for (const rt of rows) for (let k = 0; k < n; k++) {
+      const s = F.s0 + sl * (k + 0.5) / n, t = F.t0 + tl * rt;
+      const f = frameAt(F.cx + F.u[0] * s + F.v[0] * t, F.cy + F.u[1] * s + F.v[1] * t, 0, F.ang);
+      pushBox(X, f, -2.3, 2.3, -0.6, 0.6, g - 0.3, g + 0.22, [0.66, 0.66, 0.64], ZN_FIX);
+      for (const ds of [-1.1, 1.1]) {
+        pushBox(X, f, ds - 0.45, ds + 0.45, -0.3, 0.3, g + 0.22, g + 1.6, ZN_WHITE, ZN_FIX);
+        pushBox(X, f, ds - 0.47, ds + 0.47, -0.32, 0.32, g + 1.6, g + 1.95, pas, [0.7, 1, 0, 1]);
+      }
+    }
+    if (zn.pl) znPylon(X, pushBox, zn.pl, zn);
+    return true;
+  }
+  // celá budova: pás po obvodu
+  const kfc = zn.k === 'kfc';
+  for (let i = 0; i < ring.length; i++) {
+    const E = znEdge(ring, i, frameAt); if (E.L < 0.3) continue;
+    znBand(X, pushBox, E, -0.1, E.L + 0.1, e - ph, e + 0.45, pas, p2, kfc);
+  }
+  const [fi, fs] = zn.f, E = znEdge(ring, fi, frameAt), L = E.L, f = E.f;
+  const por = zn.por;
+  let lw = Math.min(7, Math.max(2.6, L * 0.2)), lt = -0.55, lz0 = e - ph - 0.2, lz1 = e + 1.6, ls = fs, txtDone = false;
+  if (por === 'lidl') {                                          // prosklený vstup s kosou střechou vybíhající nahoru ven
+    const W = Math.min(16, Math.max(8, L * 0.35)), D = 3.4, s0 = fs - W / 2, s1 = fs + W / 2;
+    pushBox(X, f, s0, s1, -D, 0.05, g - 0.3, e + 0.4, ZN_GLASS, ZN_GL, [0.55, 0.57, 0.6]);
+    for (let s = s0; s <= s1 + 0.01; s += W / 6) pushBox(X, f, s - 0.08, s + 0.08, -D - 0.04, -D + 0.04, g, e + 0.4, [0.75, 0.77, 0.8], ZN_FIX);
+    const zi = e + 0.4, zo = e + 2.3, DO = D + 1.2;
+    pushQuad(R, f(s0 - 0.6, 0.1, zi), f(s1 + 0.6, 0.1, zi), f(s1 + 0.6, -DO, zo), f(s0 - 0.6, -DO, zo), [0.74, 0.76, 0.78], [0, 0, 1, 0]);
+    pushQuad(X, f(s0 - 0.6, -DO, zo), f(s1 + 0.6, -DO, zo), f(s1 + 0.6, 0.1, zi), f(s0 - 0.6, 0.1, zi), [0.55, 0.57, 0.60], ZN_FIX);
+    pushBox(X, f, s0 - 0.6, s1 + 0.6, -DO - 0.25, -DO + 0.05, zo - 0.7, zo + 0.1, pas, ZN_FIX);
+    ls = s1 - 1.9; lw = 3.0; lt = -DO - 0.35; lz0 = zo - 0.3; lz1 = zo + 2.7;
+  } else if (por === 'kaufland') {                               // vystupující červený vstupní portál vyšší než hala
+    const W = Math.min(16, Math.max(9, L * 0.25)), D = 3.6, s0 = fs - W / 2, s1 = fs + W / 2;
+    pushBox(X, f, s0, s1, -D, 0.1, g - 0.3, e + 3.0, pas, ZN_FIX, zdark(pas, 0.9));
+    pushBox(X, f, s0 + W * 0.15, s1 - W * 0.15, -D - 0.06, -D + 0.02, g, g + 3.8, ZN_GLASS, ZN_GL);
+    if (zn.txt) { znText(X, pushBox, f, fs, -D - 0.08, e - 0.2, 2.2, W * 0.9, zn.txt, zc(zn.tc)); txtDone = true; }
+    lw = 0;
+  } else if (por === 'sklo' || por === 'mcd' || por === 'kfc') {  // prosklený vstup se stříškou v barvě pásu
+    const W = Math.min(14, Math.max(4, L * (por === 'sklo' ? 0.3 : 0.45))), s0 = fs - W / 2, s1 = fs + W / 2;
+    pushBox(X, f, s0, s1, -2.2, 0.05, g - 0.3, g + 3.8, ZN_GLASS, ZN_GL, [0.6, 0.6, 0.62]);
+    pushBox(X, f, s0 - 0.5, s1 + 0.5, -3.0, 0.05, g + 3.8, g + 4.3, pas, ZN_FIX, zdark(pas, 0.9));
+  } else if (por === 'stres') {                                  // stříška nad vstupem na sloupech, prosklený vstup ve zdi
+    const W = Math.min(16, Math.max(6, L * 0.3)), s0 = fs - W / 2, s1 = fs + W / 2;
+    pushBox(X, f, s0 + 0.8, s1 - 0.8, -0.12, 0.02, g, g + 3.3, ZN_GLASS, ZN_GL);
+    pushBox(X, f, s0, s1, -4.5, 0.05, g + 3.6, g + 4.2, pas, ZN_FIX, zdark(pas, 0.92));
+    for (const s of [s0 + 0.4, s1 - 0.4]) pushBox(X, f, s - 0.15, s + 0.15, -4.35, -4.05, g - 0.3, g + 3.6, ZN_GREY, ZN_FIX);
+  }
+  if (zn.k === 'mcdonalds') {                                    // žluté M na průčelí
+    znArches(X, pushBox, f, fs, Math.min(4.0, L * 0.25), e - ph - 0.2, e + 1.6, -0.5, -0.3, zc([255, 199, 44]));
+  } else if (zn.txt && !txtDone && L > 6) {                      // nápis na pásu průčelí (u Lidlu je navíc cedule nad vstupem)
+    const tw = znText(X, pushBox, f, fs, -0.3, e - ph * 0.86, ph * 0.72, L * 0.7, zn.txt, zc(zn.tc));
+    if (por === 'lidl' && L > 3) znSign(X, pushBox, f, ls, lt, lz0, lz1, lw, zn.lg);
+  } else if (lw > 0) {
+    if (lz1 - lz0 > lw * 1.1) lz0 = lz1 - lw * 1.1;
+    if (L > 3) znSign(X, pushBox, f, ls, lt, lz0, lz1, lw, zn.lg);
+  }
+  if (zn.f2) {                                                   // průčelí je na odvrácené straně: nápis i na viditelné stěně
+    const E2 = znEdge(ring, zn.f2[0], frameAt), s2 = zn.f2[1];
+    if (zn.k === 'mcdonalds') znArches(X, pushBox, E2.f, s2, Math.min(4.0, E2.L * 0.25), e - ph - 0.2, e + 1.6, -0.5, -0.3, zc([255, 199, 44]));
+    else if (zn.txt) znText(X, pushBox, E2.f, s2, -0.3, e - ph * 0.86, ph * 0.72, E2.L * 0.7, zn.txt, zc(zn.tc));
+    else znSign(X, pushBox, E2.f, s2, -0.55, e - ph - 0.2, e + 1.6, Math.min(7, Math.max(2.6, E2.L * 0.2)), zn.lg);
+  }
+  if (por === 'mcd') {                                           // drive-in: pruh kolem boční a zadní stěny, výdejní okénko, menu tabule
+    for (const k of [1, 2]) {
+      const Ei = znEdge(ring, (fi + k) % ring.length, frameAt); if (Ei.L < 2) continue;
+      pushQuad(X, Ei.f(-4.5, -0.6, g + 0.08), Ei.f(Ei.L + 4.5, -0.6, g + 0.08), Ei.f(Ei.L + 4.5, -4.4, g + 0.08), Ei.f(-4.5, -4.4, g + 0.08), ZN_ASPH, [0, 1, 0, 0]);
+      for (let s = 0; s < Ei.L; s += 3) pushQuad(X, Ei.f(s, -2.45, g + 0.1), Ei.f(s + 1.5, -2.45, g + 0.1), Ei.f(s + 1.5, -2.6, g + 0.1), Ei.f(s, -2.6, g + 0.1), [0.95, 0.80, 0.20], [0, 1, 0, 0]);
+      if (k === 1) {
+        pushBox(X, Ei.f, Ei.L * 0.5 - 1, Ei.L * 0.5 + 1, -0.25, 0.02, g + 0.9, g + 2.2, ZN_GLASS, ZN_GL);
+        pushBox(X, Ei.f, Ei.L * 0.5 - 1.4, Ei.L * 0.5 + 1.4, -1.1, 0.02, g + 2.5, g + 2.8, pas, ZN_FIX);
+      } else pushBox(X, Ei.f, Ei.L * 0.5 - 0.9, Ei.L * 0.5 + 0.9, -5.1, -4.8, g - 0.3, g + 2.0, [0.15, 0.15, 0.17], [0.5, 1, 0, 0]);
+    }
+  }
+  if (zn.pl) znPylon(X, pushBox, zn.pl, zn);
+  return true;
+};
+
+// ---- Nákupní centra podle fotek (dominanty.json "spec": {"lm": "oc", "oc": {...}}, souřadnice převádí custom_prep.py) ----
+// casti: hranoly / ovály nad budovou {q | c + r [rx, ry] + a (°), z [od, do] nad terénem, wc, rc, win (styl oken) nebo sklo},
+// fasady: obklad úseku stěny {q [[x, y], [x, y]], z, c, c2 (přechod barvy), druh panel | cikcak | okno | sklo | cihla | pruhy},
+// plochy: {q, c, z, mriz} plochy na střeše (fotovoltaika),
+// cedule: {p, a (° směr nápisu, 0 = na východ), w, z, bg, fg, pruhy, txt, tc, vert (písmena pod sebou), noha}, svetliky: [[x, y, velikost, úhel°]] na střeše.
+function ocPoly(o) {
+  let pts = o.q;
+  if (!pts) {
+    const [cx, cy] = o.c, [rx, ry] = o.r, a = (o.a || 0) * Math.PI / 180, n = 24;
+    pts = []; for (let k = 0; k < n; k++) { const t = 2 * Math.PI * k / n, x = Math.cos(t) * rx, y = Math.sin(t) * ry; pts.push([cx + x * Math.cos(a) - y * Math.sin(a), cy + x * Math.sin(a) + y * Math.cos(a)]); }
+  }
+  let A = 0; for (let i = 0; i < pts.length; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % pts.length]; A += x0 * y1 - x1 * y0; }
+  return A < 0 ? pts.slice().reverse() : pts;
+}
+landmarks.oc = function (b, { X, W, R, frameAt, pushBox, pushQuad, pushTri, tv }) {
+  const o = b.oc; if (!o) return true;
+  const g = b.g;
+  let cx = 0, cy = 0; for (const [x, y] of b.p) { cx += x / b.p.length; cy += y / b.p.length; }
+  for (const c of o.casti || []) {
+    const pts = ocPoly(c), z0 = g + c.z[0], z1 = g + c.z[1], wc = zc(c.wc), rc = zc(c.rc || [150, 152, 156]);
+    if (c.sklo) {                                                // prosklená část: sklo s příčkami a pásy stropů, v noci svítí
+      for (let i = 0; i < pts.length; i++) {
+        const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % pts.length], L = Math.hypot(x1 - x0, y1 - y0); if (L < 0.05) continue;
+        const f = frameAt(x0, y0, 0, Math.atan2(y1 - y0, x1 - x0));
+        pushQuad(X, f(0, 0, z0), f(L, 0, z0), f(L, 0, z1), f(0, 0, z1), wc, [0.45, 1, 0, 0]);
+        for (let z = z0 + 3.6; z < z1 - 0.3; z += 3.6) pushBox(X, f, 0, L, -0.1, 0.02, z - 0.14, z + 0.14, zc(c.pas || [176, 180, 186]), ZN_FIX);
+      }
+      for (let i = 1; i < pts.length - 1; i++) pushTri(R, tv(...pts[0], z1), tv(...pts[i], z1), tv(...pts[i + 1], z1), rc, [0, 0, 0, 0]);
+    } else prism(W, R, pushQuad, pushTri, tv, g, pts, z0, z1, wc, c.win ?? 15, rc);
+    if (c.atika) for (let i = 0; i < pts.length; i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % pts.length];
+      pushQuad(X, tv(x0, y0, z1), tv(x1, y1, z1), tv(x1, y1, z1 + c.atika), tv(x0, y0, z1 + c.atika), zc(c.atika_c || c.wc), ZN_FIX);
+    }
+  }
+  const fas = [];                                                // "obvod": 1 = obklad na všech stěnách půdorysu (delších než 3 m)
+  for (const fa of o.fasady || []) {
+    if (fa.obvod) { for (let i = 0; i < b.p.length; i++) { const q = [b.p[i], b.p[(i + 1) % b.p.length]]; if (Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) > 3) fas.push({ ...fa, q }); } }
+    else fas.push(fa);
+  }
+  for (const fa of fas) {
+    const [[x0, y0], [x1, y1]] = fa.q, L = Math.hypot(x1 - x0, y1 - y0); if (L < 0.5) continue;
+    let a = Math.atan2(y1 - y0, x1 - x0);
+    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, out = (-Math.sin(a)) * (cx - mx) + Math.cos(a) * (cy - my) > 0 ? -1 : 1;   // t < 0 musí být ven
+    const f = out < 0 ? frameAt(x0, y0, 0, a) : frameAt(x1, y1, 0, a + Math.PI), z0 = g + fa.z[0], z1 = g + fa.z[1], c = zc(fa.c), c2 = zc(fa.c2 || fa.c);
+    const off = fa.o || 0;
+    if (fa.druh === 'cikcak') {                                   // bílé lomené čáry na šedé stěně (Aupark)
+      pushBox(X, f, 0, L, -off - 0.12, 0.02, z0, z1, c, ZN_FIX);
+      for (const zz of [0.25, 0.7]) {
+        const per = 14, amp = (z1 - z0) * 0.22;
+        for (let s = 0; s < L - 0.5; s += per / 2) {
+          const k = Math.round(s / (per / 2)) % 2, za = z0 + (z1 - z0) * zz + (k ? amp : -amp), zb = z0 + (z1 - z0) * zz + (k ? -amp : amp), se = Math.min(L, s + per / 2), n = 8;
+          for (let j = 0; j < n; j++) { const s_ = s + (se - s) * j / n, z_ = za + (zb - za) * j / n; pushBox(X, f, s_, s_ + (se - s) / n + 0.05, -off - 0.18, -off - 0.1, z_ - 0.16, z_ + 0.16, c2, [0.3, 1, 0, 0]); }
+        }
+      }
+    } else if (fa.druh === 'okno') {                             // vystouplý tmavý rám s prosklením (Aupark)
+      pushBox(X, f, 0, L, -off - 1.4, 0.02, z0, z1, [0.20, 0.21, 0.23], ZN_FIX);
+      pushBox(X, f, 0.6, L - 0.6, -off - 1.46, -off - 1.38, z0 + 0.6, z1 - 0.6, ZN_GLASS, [0.6, 1, 0, 0]);
+    } else if (fa.druh === 'sklo') {
+      pushBox(X, f, 0, L, -off - 0.12, 0.02, z0, z1, c, [0.45, 1, 0, 0]);
+      for (let s = 0; s < L; s += 1.8) pushBox(X, f, s, s + 0.12, -off - 0.18, -off - 0.1, z0, z1, c2, ZN_FIX);
+      for (let z = z0 + 3.6; z < z1 - 0.3; z += 3.6) pushBox(X, f, 0, L, -off - 0.18, -off - 0.1, z - 0.15, z + 0.15, c2, ZN_FIX);
+    } else if (fa.druh === 'pruhy') {                            // obklad se skupinami svislých světlých pruhů a úzkými okny (Atrium)
+      pushBox(X, f, 0, L, -off - 0.12, 0.02, z0, z1, c, ZN_FIX);
+      for (let s = 3; s < L - 2; s += 8.5) {
+        for (const d of [0, 0.7, 1.4]) pushBox(X, f, s + d, s + d + 0.22, -off - 0.18, -off - 0.1, z0 + 0.8, z1 - 0.3, c2, ZN_FIX);
+        pushBox(X, f, s + 4.0, s + 4.6, -off - 0.16, -off - 0.1, z0 + (z1 - z0) * 0.3, z0 + (z1 - z0) * 0.75, [0.16, 0.17, 0.2], [0.5, 1, 0, 0]);
+      }
+    } else if (fa.druh === 'cihla') {                            // cihlový parter s perforovanými poli (Futurum)
+      pushBox(X, f, 0, L, -off - 0.12, 0.02, z0, z1, c, ZN_FIX);
+      for (let s = 2; s < L - 6; s += 9) pushBox(X, f, s, s + 6, -off - 0.18, -off - 0.1, z0 + (z1 - z0) * 0.55, z1 - 0.5, c2, ZN_FIX);
+    } else {                                                     // panely s přechodem barvy c -> c2
+      const n = Math.max(1, Math.round(L / 2.4));
+      for (let k = 0; k < n; k++) {
+        const t = n > 1 ? k / (n - 1) : 0, col = c.map((q, i) => (q + (c2[i] - q) * t) * (k % 2 ? 0.97 : 1.0));
+        pushBox(X, f, L * k / n, L * (k + 1) / n, -off - 0.18, 0.02, z0, z1, col, [0.1, 1, 0, 0]);
+      }
+    }
+  }
+  for (const pl of o.plochy || []) {                             // plochy na střeše (fotovoltaika, membrána): konvexní mnohoúhelník
+    const pts = ocPoly(pl), z = b.e + (pl.z || 0.1), col = zc(pl.c);
+    for (let i = 1; i < pts.length - 1; i++) pushTri(R, tv(...pts[0], z), tv(...pts[i], z), tv(...pts[i + 1], z), col, [0, 0, 0, 0]);
+    if (pl.mriz) { const F = frame2(pts); for (let s = F.s0 + 1.6; s < F.s1; s += 1.6) pushBox(X, frameAt(F.cx + F.u[0] * s, F.cy + F.u[1] * s, 0, F.ang), -0.05, 0.05, F.t0 * 0.95, F.t1 * 0.95, z, z + 0.04, zc(pl.mriz), ZN_FIX); }
+  }
+  for (const s of o.svetliky || []) {
+    const [x, y, w, a] = s, f = frameAt(x, y, 0, (a || 0) * Math.PI / 180), z = b.e + 0.08, col = zc(o.svetliky_c || [80, 120, 150]);
+    pushQuad(R, f(-w, 0, z), f(0, -w * 0.62, z), f(w, 0, z), f(0, w * 0.62, z), col, [0.2, 0, 0, 0]);
+  }
+  for (const c of o.cedule || []) {
+    const [x, y] = c.p, f = frameAt(x, y, 0, (c.a || 0) * Math.PI / 180), z0 = g + c.z[0], z1 = g + c.z[1], w = c.w;
+    if (c.noha) for (const s of [-w * 0.3, w * 0.3]) pushBox(X, f, s - 0.15, s + 0.15, -0.15, 0.15, g - 0.3, z0, ZN_GREY, ZN_FIX);
+    if (c.bg) pushBox(X, f, -w / 2, w / 2, -0.2, 0.2, z0, z1, zc(c.bg), ZN_GLOW, zdark(zc(c.bg), 0.9));
+    if (c.pruhy) for (let k = 0; k < 4; k++) { const zz = z0 + (z1 - z0) * (0.1 + 0.22 * k); pushBox(X, f, -w / 2 - 0.02, w / 2 + 0.02, -0.24, 0.24, zz, zz + (z1 - z0) * 0.09, zc(c.pruhy), ZN_GLOW); }
+    if (c.txt && c.vert) {                                       // svislý nápis: písmena pod sebou
+      const n = c.txt.length, h = Math.min(w / 0.6 * 0.6, (z1 - z0) / (n * 1.25));
+      for (let k = 0; k < n; k++) znText(X, pushBox, f, 0, -0.26, z1 - (k + 1) * h * 1.25, h, w, c.txt[k], zc(c.tc));
+    } else if (c.txt) znText(X, pushBox, f, 0, -0.26, z0 + (z1 - z0) * 0.12, (z1 - z0) * 0.76, w * 0.94, c.txt, zc(c.tc));
+    if (c.fg) { const h = (z1 - z0) * 0.6; pushBox(X, f, -h / 2, h / 2, -0.28, 0.28, z0 + (z1 - z0) * 0.2, z0 + (z1 - z0) * 0.2 + h, zc(c.fg), ZN_GLOW); }
+  }
+  return true;
+};

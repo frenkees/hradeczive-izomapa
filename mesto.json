@@ -122,7 +122,13 @@
   "odkazy": [
     {
       "text": "Facebook skupina",
+      "ikona": "facebook",
       "url": "https://www.facebook.com/groups/1017224468087648"
+    },
+    {
+      "text": "Instagram",
+      "ikona": "instagram",
+      "url": ""
     }
   ]
 }

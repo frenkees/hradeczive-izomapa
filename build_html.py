@@ -7,6 +7,22 @@ import geo
 from geo import MESTO
 
 
+
+SOC_IKONY = {
+    'facebook': '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.6 21v-8h2.7l.4-3.2h-3.1V7.8c0-.9.3-1.5 1.6-1.5h1.7V3.4c-.3 0-1.300-.1-2.500-.1-2.500 0-4.100 1.500-4.100 4.200v2.300H7.600V13h2.700v8z"/></svg>',
+    'instagram': '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4.500" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3.700" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16.800" cy="7.200" r="1.200" fill="currentColor"/></svg>',
+}
+
+
+def odkaz_html(o):
+    ik, url, txt = o.get('ikona'), o.get('url') or '', E(o.get('text', ''))
+    if ik in SOC_IKONY:
+        sv = SOC_IKONY[ik]
+        if url: return f'<a class="soc soc-{ik}" href="{E(url)}" target="_blank" rel="noopener" title="{txt}" aria-label="{txt}">{sv}</a>'
+        return f'<span class="soc soc-{ik} off" role="img" aria-disabled="true" title="{txt} (zatím nedostupné)" aria-label="{txt} (zatím nedostupné)">{sv}</span>'
+    return f'<a class="px-btn community" href="{E(url)}" target="_blank" rel="noopener">{txt}</a>'
+
+
 def og_obrazek(out='site/og.jpg', W=1200, H=630, dolu=1, latlon=None):
     """náhled pro sdílení (og:image) 1200×630: výřez středu města z letních dlaždic (o úroveň menší než plné rozlišení)"""
     t = json.load(open('site/tiles.json')); base = t['base']
@@ -71,7 +87,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'TITULEK': E(M['titulek']), 'POPIS': E(M['popis']), 'MESTO': E(M['nazev']), 'H1_A': E(M['h1'][0]), 'H1_B': E(M['h1'][1]),
         'PODTITUL': E(M['podtitul']),
         'HLASENI': 'true' if M.get('hlaseni') else 'false',
-        'ODKAZY': ''.join(f'<a class="px-btn community" href="{E(o["url"])}" target="_blank" rel="noopener">{E(o["text"])}</a>' for o in (M.get('odkazy') or [])),
+        'ODKAZY': ''.join(odkaz_html(o) for o in (M.get('odkazy') or [])),
         'VITR': 'true' if M.get('vitr') else 'false',
         'POCASI': 'true' if M.get('pocasi') else 'false',
         'LETADLA': 'true' if M.get('letadla', False) else 'false',

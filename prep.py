@@ -93,7 +93,8 @@ def ihash(*a):
 def load(name):
     t = pq.read_table(f'{DATA}/{name}.parquet').to_pandas()
     t = t.sort_values('id', kind='stable').reset_index(drop=True)   # pořadí ze S3 není zaručené
-    t['geom'] = t.geometry.map(lambda g: transform(lambda x, y, z=None: to_local(x, y), shapely.from_wkb(g)))
+    # souřadnice se převádí vektorově nad celým polem geometrií (dřív po jedné Python lambdou: ~10× pomalejší, výsledek stejný)
+    t['geom'] = list(shapely.transform(shapely.from_wkb(np.asarray(t.geometry.values, dtype=object)), lambda c: np.column_stack(to_local(c[:, 0], c[:, 1]))))
     return t
 
 
@@ -2018,7 +2019,11 @@ for _, r in inf.iterrows():
     elif k in ('bus_stop', 'platform'):
         if any(math.hypot(g.x - s[0], g.y - s[1]) < 14 for s in props['shelter']): continue
         nd2 = nearest_dir(g, drive_tree, drive_lines, 20)
-        props['shelter'].append([g.x, g.y, z, nd2[0] if nd2 else ang])
+        a_s = nd2[0] if nd2 else ang
+        if nd2:                                              # otevřená strana přístřešku (-y modelu = vpravo od směru) k silnici, ne podle náhodného směru čáry
+            q_ = shapely.ops.nearest_points(nd2[1][0], g)[0]
+            if math.cos(a_s) * (q_.y - g.y) - math.sin(a_s) * (q_.x - g.x) > 0: a_s += math.pi
+        props['shelter'].append([g.x, g.y, z, a_s])
 # lampy podél ulic (v datech jich je jen pár desítek)
 lamp_tree = shapely.STRtree(lamp_pts) if lamp_pts else None
 bm_arr = np.asarray(bmask)
@@ -2124,7 +2129,9 @@ if os.path.exists('assets/potrubi.json'):         # nadzemní potrubí (nastroje
 print({k: len(v) for k, v in props.items()}, 'aut', len(cars), {k: len(v) for k, v in lines_out.items()})
 
 # ---------------- stromy ----------------
-excl = np.maximum(np.asarray(notree), np.asarray(bmask.filter(ImageFilter.MaxFilter(13))))
+import scipy.ndimage as _ndi13
+_mx13 = _ndi13.maximum_filter(np.asarray(bmask), size=13)       # totéž co ImageFilter.MaxFilter(13) (ověřeno, včetně okrajů): 25 s -> <1 s
+excl = np.maximum(np.asarray(notree), _mx13)
 
 
 def free(x, y):
@@ -2357,7 +2364,7 @@ for season, pal in SEASON_PAL.items():
         img[edge] = (200, 204, 212)
     asph = np.isin(cls_a, [C['road'], C['parking']])
     img[asph & (noise > 0.97)] += 8
-    Image.fromarray(np.clip(img, 0, 255).astype(np.uint8)).save(f'{OUT}/ground_{season}.png')
+    Image.fromarray(np.clip(img, 0, 255).astype(np.uint8)).save(f'{OUT}/ground_{season}.png', compress_level=1)   # mezisoubor pro render: slabší komprese = rychlejší zápis
     print('textura', season)
 
 # světelná mapa pro noc (kužely světla lamp na zemi), 0,5 m/px

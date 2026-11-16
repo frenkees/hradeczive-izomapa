@@ -121,6 +121,12 @@ a.soc:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 rgba(0, 0, 
 .card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: .86rem; }
 .card dt { color: var(--muted); }
 .card dd { margin: 0; font-variant-numeric: tabular-nums; }
+.card dl.dep { grid-template-columns: 1fr; gap: 0; font-size: .84rem; }
+.card dl.dep dt { color: var(--ink); font-weight: 600; margin-top: 7px; }
+.card dl.dep dt:first-child { margin-top: 0; }
+.card dl.dep dd { color: var(--muted); }
+.card .tm { white-space: nowrap; }
+.card .tm + .tm::before { content: ''; }
 .card p { margin: 0; font-size: .86rem; line-height: 1.45; }
 .card .close { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; padding: 0; }
 .head { flex-wrap: wrap; row-gap: 0; }
@@ -250,6 +256,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     padding: 6px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px));
     transition: transform .2s ease;
   }
+  .card.dep-card { max-height: 38%; }
+  .card.dep-card h2 { font-size: 1.05rem; }
+  .card dl.dep { font-size: .78rem; }
   .card .grab { display: block; width: 44px; height: 5px; background: var(--edge); margin: 4px auto 6px; touch-action: none; }
   .card .close { top: 10px; right: max(10px, env(safe-area-inset-right, 0px)); width: 44px; height: 44px; }
 }
@@ -868,13 +877,19 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 
   // ---------- karta ----------
   const ROOF = { flat: 'plochá', gabled: 'sedlová', hipped: 'valbová', pyramidal: 'stanová' };
-  function showCard({ title, text, rows, lon, lat, k, link, linkText, target }) {
+  function showCard({ title, text, rows, lon, lat, k, link, linkText, target, dep }) {
     $('cardTitle').textContent = title;
     if (k && !(LAYERS.find((l) => l.key === k) || {}).status?.startsWith('hotovo')) { const t = document.createElement('span'); t.className = 'wip-tag'; t.textContent = 'Rozpracováno'; $('cardTitle').append(' ', t); }
     $('cardText').hidden = !text; $('cardText').textContent = text || '';
     $('cardExtra').replaceChildren();
-    const dl = $('cardDl'); dl.replaceChildren();
-    for (const [k, v] of rows) { if (v === undefined || v === null || v === '') continue; const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); }
+    const dl = $('cardDl'); dl.replaceChildren(); dl.classList.toggle('dep', !!dep); $('card').classList.toggle('dep-card', !!dep);   // dep: odjezdy (řádek = spoj, časy se nezalamují uprostřed)
+    for (const [k, v] of rows) {
+      if (v === undefined || v === null || v === '') continue;
+      const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd');
+      if (Array.isArray(v)) v.forEach((s, i) => { const sp = document.createElement('span'); sp.className = 'tm'; sp.textContent = s; if (i) dd.append(' '); dd.append(sp); });
+      else dd.textContent = v;
+      dl.append(dt, dd);
+    }
     const links = $('cardLinks'); links.replaceChildren();
     if (link) {
       const btn = document.createElement('a'); btn.href = link; btn.className = 'card-neighbor-btn';
@@ -937,6 +952,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     state.sel = b;
     const pl = placeOf(b);
     const nm = pl ? pl.name : b.name;
+    if (nm === 'Hlavní nádraží' && MHD.names && MHD.trips) { showStation(b); return; }
     const story = (pl && pl.text) || b.text || (nm && placeByName[nm] ? placeByName[nm].text : null);
     const title = nm || b.cls[0].toUpperCase() + b.cls.slice(1);
     showCard({ title, text: story, lon: b.lon, lat: b.lat, k: b.k, rows: [
@@ -1817,16 +1833,16 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       index.push({ label: nm, kind: 'zastávka', k: `c${Math.round(s.x / (2 * cam.half))}_${Math.round(s.y / (2 * cam.half))}`, n: norm(nm), go: () => { goTo(s.ix, s.iy, 2); showStop(s); } });
     }
   }
-  function stopDepartures(nid) {                             // [s do odjezdu, spoj] na hodinu dopředu (bez cílové zastávky spoje), i noční spoje po půlnoci
+  function stopDepartures(nid, vlaky = false) {                             // [s do odjezdu, spoj] na hodinu dopředu (bez cílové zastávky spoje), i noční spoje po půlnoci
     const p = pragueNow(), y = new Date(); y.setDate(y.getDate() - 1);
     const zit = new Date(); zit.setDate(zit.getDate() + 1);
     let today = mhdServices(p.d, p.wd, true);
     if (!MHD.trips.some((t) => today.has(t[2]))) today = mhdServices(p.d, p.wd, false);
     const yest = mhdServices(ymd(y), (p.wd + 6) % 7, false), tom = mhdServices(ymd(zit), (p.wd + 1) % 7, false), out = [];
     for (const [svc, base] of [[today, 0], [yest, -86400], [tom, 86400]]) for (const t of MHD.trips) {
-      if (!svc.has(t[2]) || MHD.routes[t[0]][1] === 2) continue;
+      if (!svc.has(t[2]) || (MHD.routes[t[0]][1] === 2) !== vlaky) continue;
       const z = t[6];
-      for (let k = 0; k < z.length - 2; k += 2) if (z[k] === nid) { const dt = base + t[3] + z[k + 1] - p.s; if (dt >= -20 && dt <= 3600) out.push([dt, t]); }
+      for (let k = 0; k < z.length - 2; k += 2) if (vlaky ? nid.has(z[k]) : z[k] === nid) { const dt = base + t[3] + z[k + 1] - p.s; if (dt >= -20 && dt <= 3600) out.push([dt, t]); }
     }
     return out.sort((a, b) => a[0] - b[0]);
   }
@@ -1840,9 +1856,24 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       if (!groups.has(key)) groups.set(key, []);
       if (groups.get(key).length < 3) groups.get(key).push(dt);
     }
-    const rows = [...groups.entries()].sort((a, b) => a[1][0] - b[1][0]).slice(0, 10).map(([k, v]) => [k, `${hm(v[0])} (${za(v[0])})` + v.slice(1).map((d) => ', ' + hm(d)).join('')]);
+    const rows = [...groups.entries()].sort((a, b) => a[1][0] - b[1][0]).slice(0, 10).map(([k, v]) => [k, [`${hm(v[0])} (${za(v[0])})`, ...v.slice(1).map((d) => hm(d))]]);
     showCard({ title: `Zastávka ${MHD.names[s.n]}`, text: rows.length ? 'Odjezdy podle jízdního řádu, bez zpoždění.' : 'V příští hodině odtud podle jízdního řádu nic nejede.',
-      rows, lon: s.x / cam.kx + cam.lon0, lat: s.y / cam.ky + cam.lat0 });
+      rows, dep: true, lon: s.x / cam.kx + cam.lon0, lat: s.y / cam.ky + cam.lat0 });
+  }
+  // hlavní nádraží: kliknutí na budovu ukáže vlaky, které odtud odjedou v příští hodině (z jízdních řádů, bez zpoždění)
+  function showStation(b) {
+    state.sel = b;
+    const ids = new Set(); MHD.names.forEach((n, i) => { if (/^Hradec Králové,? hlavní nádraží/i.test(n)) ids.add(i); });
+    const hm = (dt) => { const p = pragueNow(), v = Math.round((p.s + dt) / 60) % 1440; return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`; };
+    const rows = [];
+    for (const [dt, t] of stopDepartures(ids, true).slice(0, 12)) {
+      const z = t[6]; let kol = '';
+      for (let k = 0; k < z.length - 2; k += 2) if (ids.has(z[k])) { const m = /kolej (\w+)/.exec(MHD.names[z[k]]); if (m) kol = `kolej ${m[1]}`; break; }
+      const dest = MHD.names[t[5]].replace(/^Hradec Králové,? /, '');
+      rows.push([`${MHD.routes[t[0]][0]} → ${dest}`, [`${hm(dt)} (${dt < 60 ? 'teď' : 'za ' + Math.round(dt / 60) + ' min'})`, kol].filter(Boolean)]);
+    }
+    showCard({ title: 'Hlavní nádraží – odjezdy vlaků', text: rows.length ? 'Vlaky v příští hodině podle jízdního řádu, bez zpoždění. Číslo koleje je odhad.' : 'V příští hodině odtud podle jízdního řádu nic nejede.',
+      rows, dep: true, lon: b.lon, lat: b.lat });
   }
   const stopAt = (ix, iy) => {                              // zastávka pod kliknutím (do ~20 px na obrazovce, nejméně 6 m)
     if (!MHD.stopPts) return null;
@@ -1855,14 +1886,17 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   function mhdPos(trip, el, T = 0, off = 0) {                              // kde na trase je spoj el sekund po výjezdu
     const q = trip[4]; let i = 2; while (i < q.length - 2 && q[i] < el) i += 2;
     const f = Math.max(0, Math.min(1, (el - q[i - 2]) / ((q[i] - q[i - 2]) || 1)));
-    const sh = MHD.shapes[trip[1]], L = sh.len, s0 = Math.min(sh.L, q[i - 1] + (q[i + 1] - q[i - 1]) * f), s = Math.max(0, Math.min(sh.L, Math.max(T / 2, Math.min(sh.L - T / 2, s0)) + off));   // T: délka vlaku, off: článek od středu
+    // T: délka vlaku, off: článek od středu. Vlak stojí na zastávce STŘEDEM (střed nástupiště), takže na konci trasy vlak přesahuje o půl délky za konec
+    // (rovně po poslední úsečce), ať stojí celý u nástupiště a nezačíná u jeho středu; autobusy a tramvaje se drží uvnitř trasy
+    const vl = MHD.routes[trip[0]][1] === 2;
+    const sh = MHD.shapes[trip[1]], L = sh.len, s0 = Math.min(sh.L, q[i - 1] + (q[i + 1] - q[i - 1]) * f), s = vl ? Math.max(0, Math.min(sh.L, s0)) + off : Math.max(0, Math.min(sh.L, Math.max(T / 2, Math.min(sh.L - T / 2, s0)) + off));
     const at = (s) => {
       let k = 1; while (k < L.length - 1 && L[k] < s) k++;
-      const a = sh.w[k - 1], b = sh.w[k], u = Math.max(0, Math.min(1, (s - L[k - 1]) / ((L[k] - L[k - 1]) || 1)));
+      const a = sh.w[k - 1], b = sh.w[k], u = vl ? (s - L[k - 1]) / ((L[k] - L[k - 1]) || 1) : Math.max(0, Math.min(1, (s - L[k - 1]) / ((L[k] - L[k - 1]) || 1)));   // vlak: u mimo 0–1 = prodloužení trasy
       return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
     };
     // směr z bodů 4 m před a za vozidlem: trasy z GTFS mívají u zastávek krátké zalomené úseky, podle kterých by se vůz stočil napříč
-    const [x, y] = at(s), p0 = at(Math.max(0, s - 4)), p1 = at(Math.min(sh.L, s + 4)), dx = p1[0] - p0[0], dy = p1[1] - p0[1];
+    const [x, y] = at(s), p0 = at(vl ? s - 4 : Math.max(0, s - 4)), p1 = at(vl ? s + 4 : Math.min(sh.L, s + 4)), dx = p1[0] - p0[0], dy = p1[1] - p0[1];
     const h = deckZ(x, y, dx, dy) ?? gz(x, y), [ix, iy] = toImg(x, y, h);
     return { x, y, z: h, ix, iy, dx, dy, dirSign: 1, s };   // z: autobus, tramvaj a vlak na mostě ve výšce mostovky
   }

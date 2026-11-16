@@ -283,11 +283,16 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
         _tr = _Tr.from_crs(4326, 5514, always_xy=True)
         PAVED = np.isin(S, [C[k] for k in ('road', 'parking', 'cobble', 'plaza', 'plaza2', 'footway', 'paved', 'curb')])
         xs_ = (np.arange(c0, c1) + 0.5) * TEX_RES - HE
+        # převod do S-JTSK po pixelech (pyproj ~40 s) nahrazen bilineární interpolací z hrubé sítě 49 × 49 (chyba < 0,1 mm, projekce je hladká)
+        _gx = np.linspace(xs_[0], xs_[-1], 49); _gy = np.linspace(HE - (r0 + 0.5) * TEX_RES, HE - (r1 - 0.5) * TEX_RES, 49)
+        _glo, _gla = to_lonlat(*np.meshgrid(_gx, _gy)); _gkx, _gky = _tr.transform(_glo.ravel(), _gla.ravel()); _gkx, _gky = _gkx.reshape(49, 49), _gky.reshape(49, 49)
+        def _tr_fast(x_, y_):
+            fx = (x_ - _gx[0]) / (_gx[-1] - _gx[0]) * 48; fy = (y_ - _gy[0]) / (_gy[-1] - _gy[0]) * 48
+            return _ndi.map_coordinates(_gkx, [fy, fx], order=1, mode='nearest'), _ndi.map_coordinates(_gky, [fy, fx], order=1, mode='nearest')
         for rb in range(0, S.shape[0], 400):
             ys_ = HE - (np.arange(r0 + rb, min(r1, r0 + rb + 400)) + 0.5) * TEX_RES
             GX, GY = np.meshgrid(xs_, ys_)
-            lo_, la_ = to_lonlat(GX.ravel(), GY.ravel())
-            KX_, KY_ = _tr.transform(lo_, la_)
+            KX_, KY_ = _tr_fast(GX.ravel(), GY.ravel())
             ti, tj = np.floor(KX_ / _ZM).astype(np.int64), np.floor(KY_ / _ZM).astype(np.int64)
             hit = np.zeros(KX_.shape, bool)
             for key in set(zip(ti.tolist(), tj.tolist())):
@@ -476,6 +481,30 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             else: props['lamp'].append([x, y, float(ground(x, y)), a_])
             _nl += 1
         if _nm or _nw: print('MMHK: lamp postavených na mostovku', _nm, 'nad vodou mimo most vynecháno', _nw)
+        # 6b) svislé dopravní značky z pasportu (skripty/mmhk_znacky.py): sloupek s tabulí podle druhu značky, tabule kolmo k ose nejbližší silnice
+        #     (vypnout IZO_ZNACKY_DZ=0). Kategorie: sg_a výstražné, sg_bs stůj/dej přednost, sg_b zákazové, sg_c příkazové, sg_p přednostní,
+        #     sg_i informativní, sg_e dodatkové tabulky, sg_o ostatní.
+        if os.environ.get('IZO_ZNACKY_DZ', '1') != '0' and _MMHK.get('znacky'):
+            import re as _re2
+            _SGK = [(_re2.compile(r'^A'), 'sg_a'), (_re2.compile(r'^B[12](?!\d)'), 'sg_bs'), (_re2.compile(r'^B'), 'sg_b'), (_re2.compile(r'^C'), 'sg_c'),
+                    (_re2.compile(r'^P'), 'sg_p'), (_re2.compile(r'^I'), 'sg_i'), (_re2.compile(r'^E'), 'sg_e')]
+            for _k2 in [k_[1] for k_ in _SGK] + ['sg_o']: props.setdefault(_k2, [])
+            _sbt = shapely.STRtree([Polygon(b_['p']) for b_ in buildings if len(b_['p']) >= 3])
+            _nz_, _seen = 0, set()
+            for la_, lo_, sym_, rot_ in _MMHK['znacky']:
+                x, y = (float(v) for v in to_local(lo_, la_)); q = Point(x, y)
+                if not (AREA.contains(q) and _MM_PILP.contains(q)) or _PRE_ZP.contains(q): continue
+                kk_ = (round(x, 1), round(y, 1), sym_)
+                if kk_ in _seen: continue
+                _seen.add(kk_)
+                nd_ = nearest_dir(q, all_tree, all_lines, 15)
+                if not nd_ or len(_sbt.query(q.buffer(0.3), predicate='intersects')): continue
+                r_ = _on_deck(q, 3.0)
+                if r_ is not None: z_ = r_[5]
+                elif _w20.contains(q): continue
+                else: z_ = float(ground(x, y))
+                props[next((k_ for rx_, k_ in _SGK if rx_.search(sym_)), 'sg_o')].append([round(x, 2), round(y, 2), round(z_, 2), round(nd_[0], 3)]); _nz_ += 1
+            print('MMHK: svislých značek', _nz_)
         # 7) zaparkovaná auta na skutečných stáních (řady stání ze značení); odhadnutá auta u ulic v oblasti pryč
         _stn = [s for s in _MMHK['stani'] if _mm_inbb([[s[0], s[1]]]) and not _PRE_ZP.contains(Point(*_mm_xy([[s[0], s[1]]])[0]))]
         _sxy = _mm_xy([[s[0], s[1]] for s in _stn]) if _stn else np.zeros((0, 2))
@@ -627,6 +656,8 @@ if HOOK == 'props' and os.environ.get('IZO_ZNACKY', '1') != '0' and os.path.exis
         if _z:
             _rp = _gm.representative_point(); _zhits.append((_z, _rp.x, _rp.y, 1))
 
+    _ZIGN = [(*(float(v) for v in to_local(i_['lon'], i_['lat'])), float(i_.get('r', 60))) for i_ in _ZT.get('ignoruj', [])]   # místa, kde značku nekreslit (stavba, zavřeno)
+    _zhits = [h_ for h_ in _zhits if not any(math.hypot(h_[1] - x_, h_[2] - y_) < r_ for x_, y_, r_ in _ZIGN)]
     _zb = [(k, Polygon(b['p'])) for k, b in enumerate(buildings) if len(b['p']) >= 3 and not b.get('only')]
     _zb = [(k, q if q.is_valid else q.buffer(0)) for k, q in _zb]
     _ztree = shapely.STRtree([q for _, q in _zb])

@@ -7,6 +7,7 @@
   "txt/tc = nápis na průčelí (písmo 3×5, velká písmena bez diakritiky) a jeho barva, logo = [podklad, znak, rámeček|null] cedule na průčelí a pylonu, portal = tvar vstupu (lidl, kaufland, sklo, stres, mcd, kfc), pylon = výška pylonu u vjezdu v m (0 = bez).",
   "Barvy jsou zjednodušené značkové barvy (odhad z obecně známých log, ne fotky konkrétní prodejny)."
  ],
+ "ignoruj": [{"lat": 50.19929, "lon": 15.83597, "r": 70, "proc": "Kaufland u záchranky je ještě ve výstavbě (hlášení z mapy, issue #3)"}],
  "vynech": ["storage_facility", "professional_service", "automotive_service", "b2b_transportation_and_storage_service", "travel_and_transportation",
             "home_service", "animal_or_pet_service", "specialty_store", "personal_or_beauty_service", "sport_league"],
  "znacky": [

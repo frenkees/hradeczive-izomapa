@@ -58,3 +58,4 @@ landmarks_ref/
 # Hradec Králové: stažená data magistrátu (../skripty/mmhk_pasport.py)
 assets/mmhk.json
 assets/mmhk_znaceni/
+assets/here_segmenty.json

@@ -92,6 +92,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'VITR': 'true' if M.get('vitr') else 'false',
         'POCASI': 'true' if M.get('pocasi') else 'false',
         'LETADLA': 'true' if M.get('letadla', False) else 'false',
+        'DOPRAVA_HERE': 'true' if M.get('doprava_here') else 'false',
         'POHLED': json.dumps(pohled if isinstance(pohled, list) and len(pohled) >= 2 else None),
         'DOMU_CELEK': 'true' if M.get('domu_celek') else 'false',
         'STROM': json.dumps(strom if isinstance(strom, list) and len(strom) == 2 else None),
@@ -109,6 +110,7 @@ def postav_stranku(M, html_out='site/index.html', og_cesta='og.jpg', je_obec=Fal
         'DALSI_ZDROJE': ''.join(f', <a href="{E(z["url"])}" target="_blank" rel="noopener">{E(z["text"])}</a>' if z.get('url') else f', {E(z["text"])}'
                                 for z in M.get('dalsi_zdroje', [])),
         'LETADLA_ZDROJ': ', letadla © <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a> (ODbL)' if M.get('letadla', False) else '',
+        'DOPRAVA_HERE_ZDROJ': ', provoz © <a href="https://www.here.com/" target="_blank" rel="noopener">HERE</a>' if M.get('doprava_here') else '',
         # vlastní rozšíření prohlížeče města (assets/custom_web.js, zkopíruje se do site/): window.IZOMAPA_PLUGINS
         'CUSTOM_WEB': (f'<script src="custom_web.js?v={int(os.path.getmtime("assets/custom_web.js"))}"></script>' + '\n')
                       if os.path.exists('assets/custom_web.js') else '',

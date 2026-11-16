@@ -127,6 +127,25 @@ a.soc:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 rgba(0, 0, 
 .card dl.dep dd { color: var(--muted); }
 .card .tm { white-space: nowrap; }
 .card .tm + .tm::before { content: ''; }
+/* odjezdová tabule: mechanická tabule s klapkami (každé písmeno je klapka, která se přelistuje) ve stylu SimCity 2000 */
+.board { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  width: min(440px, calc(100vw - 24px)); background: #15181d; border: 3px solid #4a4f58; box-shadow: 4px 4px 0 rgba(0, 0, 0, .45), inset 0 0 0 2px #0b0c0f;
+  padding: 8px 10px 6px; font-family: var(--display); color: #ffd24a; --fs: min(12.4px, calc((100vw - 114px) / 27.2)); }
+.board[hidden] { display: none; }
+.bd-head { display: flex; align-items: center; gap: 10px; padding: 0 34px 6px 0; position: relative; font-size: calc(var(--fs) * .95); letter-spacing: .06em; color: #e8e8e2; }
+.bd-head .bd-clock { margin-left: auto; color: #ffd24a; font-variant-numeric: tabular-nums; }
+.bd-head .close { position: absolute; top: -4px; right: -4px; width: 30px; height: 30px; padding: 0; }
+.bd-row { display: flex; gap: calc(var(--fs) * .7); margin-top: 4px; }
+.bd-grp { display: flex; gap: 2px; }
+.fl { position: relative; display: inline-block; width: calc(var(--fs) * .78); height: calc(var(--fs) * 1.45); line-height: calc(var(--fs) * 1.45); text-align: center;
+  background: linear-gradient(#24272d 0 49%, #101215 51% 100%); color: #ffd24a; font-size: var(--fs); font-weight: 600; border-radius: 2px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px #0a0b0d; text-shadow: 0 0 .35em rgba(255, 210, 74, .35); }
+.fl::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: #050506; box-shadow: 0 1px 0 rgba(255, 255, 255, .06); }
+.fl.fp { animation: flap .07s steps(2) 1; }
+@keyframes flap { 0% { transform: scaleY(1); } 50% { transform: scaleY(.55); filter: brightness(.7); } 100% { transform: scaleY(1); } }
+.bd-foot { margin-top: 6px; font-size: calc(var(--fs) * .62); color: #8e939c; letter-spacing: .03em; }
+@media (max-width: 640px) { .board { bottom: calc(env(safe-area-inset-bottom, 0px) + 70px); } }
+@media (prefers-reduced-motion: reduce) { .fl.fp { animation: none; } }
 .card p { margin: 0; font-size: .86rem; line-height: 1.45; }
 .card .close { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; padding: 0; }
 .head { flex-wrap: wrap; row-gap: 0; }
@@ -358,6 +377,11 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
 </aside>
 
 <div class="follow" id="follow" hidden aria-live="polite"><span id="followTxt"></span><button class="px-btn" id="routeFit" type="button" hidden style="width:auto;padding:0 8px">Celá trasa</button><button class="px-btn" id="followStop" type="button" aria-label="Přestat sledovat">×</button></div>
+<section class="board" id="board" hidden aria-label="Odjezdy vlaků z hlavního nádraží">
+  <div class="bd-head"><span class="bd-title">HLAVNÍ NÁDRAŽÍ · ODJEZDY</span><span class="bd-clock" id="bdClock"></span><button class="px-btn close" id="bdClose" type="button" aria-label="Zavřít tabuli">×</button></div>
+  <div class="bd-rows" id="bdRows" role="table"></div>
+  <div class="bd-foot">Podle jízdního řádu, bez zpoždění · číslo koleje je odhad</div>
+</section>
 <section class="card" id="card" hidden aria-live="polite">
   <div class="grab" id="grab" aria-hidden="true"></div>
   <button class="px-btn close" id="cardClose" type="button" aria-label="Zavřít">×</button>
@@ -952,7 +976,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     state.sel = b;
     const pl = placeOf(b);
     const nm = pl ? pl.name : b.name;
-    if (nm === 'Hlavní nádraží' && MHD.names && MHD.trips) { showStation(b); return; }
+    if (nm === STANICE.nazev && MHD.names && MHD.trips) { BD.auto = true; showStation(b); return; }
     const story = (pl && pl.text) || b.text || (nm && placeByName[nm] ? placeByName[nm].text : null);
     const title = nm || b.cls[0].toUpperCase() + b.cls.slice(1);
     showCard({ title, text: story, lon: b.lon, lat: b.lat, k: b.k, rows: [
@@ -1833,7 +1857,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       index.push({ label: nm, kind: 'zastávka', k: `c${Math.round(s.x / (2 * cam.half))}_${Math.round(s.y / (2 * cam.half))}`, n: norm(nm), go: () => { goTo(s.ix, s.iy, 2); showStop(s); } });
     }
   }
-  function stopDepartures(nid, vlaky = false) {                             // [s do odjezdu, spoj] na hodinu dopředu (bez cílové zastávky spoje), i noční spoje po půlnoci
+  function stopDepartures(nid, vlaky = false, horizont = 3600) {                             // [s do odjezdu, spoj] na hodinu dopředu (bez cílové zastávky spoje), i noční spoje po půlnoci
     const p = pragueNow(), y = new Date(); y.setDate(y.getDate() - 1);
     const zit = new Date(); zit.setDate(zit.getDate() + 1);
     let today = mhdServices(p.d, p.wd, true);
@@ -1842,7 +1866,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     for (const [svc, base] of [[today, 0], [yest, -86400], [tom, 86400]]) for (const t of MHD.trips) {
       if (!svc.has(t[2]) || (MHD.routes[t[0]][1] === 2) !== vlaky) continue;
       const z = t[6];
-      for (let k = 0; k < z.length - 2; k += 2) if (vlaky ? nid.has(z[k]) : z[k] === nid) { const dt = base + t[3] + z[k + 1] - p.s; if (dt >= -20 && dt <= 3600) out.push([dt, t]); }
+      for (let k = 0; k < z.length - 2; k += 2) if (vlaky ? nid.has(z[k]) : z[k] === nid) { const dt = base + t[3] + z[k + 1] - p.s; if (dt >= -20 && dt <= horizont) out.push([dt, t]); }
     }
     return out.sort((a, b) => a[0] - b[0]);
   }
@@ -1860,21 +1884,95 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     showCard({ title: `Zastávka ${MHD.names[s.n]}`, text: rows.length ? 'Odjezdy podle jízdního řádu, bez zpoždění.' : 'V příští hodině odtud podle jízdního řádu nic nejede.',
       rows, dep: true, lon: s.x / cam.kx + cam.lon0, lat: s.y / cam.ky + cam.lat0 });
   }
-  // hlavní nádraží: kliknutí na budovu ukáže vlaky, které odtud odjedou v příští hodině (z jízdních řádů, bez zpoždění)
-  function showStation(b) {
-    state.sel = b;
-    const ids = new Set(); MHD.names.forEach((n, i) => { if (/^Hradec Králové,? hlavní nádraží/i.test(n)) ids.add(i); });
-    const hm = (dt) => { const p = pragueNow(), v = Math.round((p.s + dt) / 60) % 1440; return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`; };
-    const rows = [];
-    for (const [dt, t] of stopDepartures(ids, true).slice(0, 12)) {
-      const z = t[6]; let kol = '';
-      for (let k = 0; k < z.length - 2; k += 2) if (ids.has(z[k])) { const m = /kolej (\w+)/.exec(MHD.names[z[k]]); if (m) kol = `kolej ${m[1]}`; break; }
-      const dest = MHD.names[t[5]].replace(/^Hradec Králové,? /, '');
-      rows.push([`${MHD.routes[t[0]][0]} → ${dest}`, [`${hm(dt)} (${dt < 60 ? 'teď' : 'za ' + Math.round(dt / 60) + ' min'})`, kol].filter(Boolean)]);
-    }
-    showCard({ title: 'Hlavní nádraží – odjezdy vlaků', text: rows.length ? 'Vlaky v příští hodině podle jízdního řádu, bez zpoždění. Číslo koleje je odhad.' : 'V příští hodině odtud podle jízdního řádu nic nejede.',
-      rows, dep: true, lon: b.lon, lat: b.lat });
+  // hlavní nádraží: odjezdová tabule s klapkami. Řádky = nejbližší odjezdy podle jízdního řádu; první odjíždějící je nahoře. Jakmile odjede, tabule se
+  // po řádcích přelistuje (každé písmeno prochází abecedu jako mechanická klapka). Otevře ji klik na budovu nádraží nebo přiblížení k nádraží.
+  const STANICE = { lat: 50.214528, lon: 15.810767, re: /^Hradec Králové,? hlavní nádraží/i, nazev: 'Hlavní nádraží' };   // městský údaj (budova dominanty Hlavní nádraží)
+  const BD = { n: 7, w: [5, 8, 17, 2], shown: null, busy: false, timer: 0, ids: null, auto: true, open: false, built: false };
+  const BD_CH = ' ABCDEFGHIJKLMNOPQRSTUVWXYZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ0123456789.-/:';
+  const bdRed = matchMedia('(prefers-reduced-motion: reduce)');
+  const bdStr = (s, w) => { s = String(s).toUpperCase().replace(/[^ A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ0-9.\-/:]/g, ''); return (s.length > w ? s.slice(0, w) : s).padEnd(w, ' '); };
+  function bdIds() {
+    if (!BD.ids) { BD.ids = new Set(); MHD.names.forEach((n, i) => { if (STANICE.re.test(n)) BD.ids.add(i); }); }
+    return BD.ids;
   }
+  function bdData() {                                         // [[čas, vlak, směr, kolej] jako řetězce pevné šířky]
+    const hm = (dt) => { const p = pragueNow(), v = Math.round((p.s + dt) / 60) % 1440; return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`; };
+    const ids = bdIds(), out = [];
+    for (const [dt, t] of stopDepartures(ids, true, 12 * 3600)) {
+      if (dt <= 0) continue;                                  // už odjel
+      const z = t[6]; let kol = '';
+      for (let k = 0; k < z.length - 2; k += 2) if (ids.has(z[k])) { const m = /kolej (\w+)/.exec(MHD.names[z[k]]); if (m) kol = m[1]; break; }
+      const pr = MHD.routes[t[0]][0].split(' '), dest = MHD.names[t[5]].replace(/^Hradec Králové,? /, '');
+      out.push([bdStr(hm(dt), BD.w[0]), bdStr(`${pr[0]} ${pr[pr.length - 1]}`, BD.w[1]), bdStr(dest, BD.w[2]), bdStr(kol, BD.w[3])]);
+      if (out.length >= BD.n) break;
+    }
+    while (out.length < BD.n) out.push(BD.w.map((w) => ' '.repeat(w)));
+    return out;
+  }
+  function bdBuild() {
+    const rows = $('bdRows'); rows.replaceChildren();
+    for (let r = 0; r < BD.n; r++) {
+      const row = document.createElement('div'); row.className = 'bd-row'; row.setAttribute('role', 'row');
+      BD.w.forEach((w, g) => { const grp = document.createElement('div'); grp.className = 'bd-grp g-' + 'tnds'[g]; for (let c = 0; c < w; c++) { const f = document.createElement('span'); f.className = 'fl'; f.textContent = ' '; grp.append(f); } row.append(grp); });
+      rows.append(row);
+    }
+    BD.built = true; BD.shown = Array.from({ length: BD.n }, () => BD.w.map((w) => ' '.repeat(w)));
+  }
+  function bdFlip(cell, to, delay) {                          // přelistuje klapku z aktuálního znaku na cílový (prochází abecedu po pořadí)
+    const cur = cell.textContent || ' ';
+    if (cur === to) return;
+    setTimeout(() => {
+      let a = Math.max(0, BD_CH.indexOf(cur)); const b = Math.max(0, BD_CH.indexOf(to));
+      const steps = ((b - a + BD_CH.length) % BD_CH.length) || BD_CH.length;
+      if (bdRed.matches) { cell.textContent = to; return; }
+      const k = Math.max(0, steps - 16); let n = 0;           // dlouhé cesty se zkrátí: klapka by rolovala příliš dlouho
+      a = (a + k) % BD_CH.length;
+      const tick = () => {
+        a = (a + 1) % BD_CH.length; cell.textContent = BD_CH[a]; cell.classList.remove('fp'); void cell.offsetWidth; cell.classList.add('fp');
+        if (++n < steps - k) setTimeout(tick, 38 + Math.random() * 28); else cell.textContent = to;
+      };
+      tick();
+    }, delay);
+  }
+  function bdApply(data, stagger) {                           // přepíše jen řádky, které se změnily; řádky po jednom se zpožděním
+    const rows = $('bdRows').children; let d = 0, last = 0;
+    data.forEach((row, r) => {
+      if (row.join('|') === BD.shown[r].join('|')) return;
+      row.forEach((s, g) => { const cells = rows[r].children[g].children; for (let c = 0; c < s.length; c++) bdFlip(cells[c], s[c], d + c * 18 + g * 40); });
+      d += stagger; last = d;
+    });
+    BD.shown = data.map((r) => r.slice());
+    BD.busy = true; setTimeout(() => { BD.busy = false; }, last + 1800);
+  }
+  function bdTick() {
+    if (!BD.open || document.hidden) return;
+    const p = pragueNow(); $('bdClock').textContent = `${Math.floor(p.s / 3600)}:${String(Math.floor(p.s / 60) % 60).padStart(2, '0')}`;
+    if (BD.busy) return;
+    const data = bdData();
+    if (data.some((r, i) => r.join('|') !== BD.shown[i].join('|'))) bdApply(data, 520);   // první řádek odjel: tabule se přepisuje řádek po řádku
+  }
+  function bdOpen() {
+    if (!MHD.names || !MHD.trips || BD.open) return;
+    if (!BD.built) bdBuild();
+    closeCard(); BD.open = true; $('board').hidden = false;
+    BD.busy = false; bdApply(bdData(), 170);                  // otevření: řádky naskakují jeden po druhém
+    clearInterval(BD.timer); BD.timer = setInterval(bdTick, 1000); bdTick();
+  }
+  function bdClose(user) { BD.open = false; $('board').hidden = true; clearInterval(BD.timer); if (user) BD.auto = false; }
+  $('bdClose').addEventListener('click', () => bdClose(true));
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && BD.open) bdClose(true); });
+  function bdWatch() {                                        // přiblížení k nádraží otevře tabuli; po zavření se znovu otevře až po odjezdu od nádraží a návratu
+    if (!MHD.names || !MHD.trips) return;
+    const x = (STANICE.lon - cam.lon0) * cam.kx, y = (STANICE.lat - cam.lat0) * cam.ky, [ix, iy] = toImg(x, y, gz(x, y));
+    const b = viewer.viewport.getBounds(true), cx = (b.x + b.width / 2) * W, cy = (b.y + b.height / 2) * W;
+    const scr = viewer.viewport.getContainerSize().x / (b.width * W), blizko = scr >= 0.3 && Math.hypot(cx - ix, cy - iy) < 520;
+    BD.dbg = { scr, d: Math.hypot(cx - ix, cy - iy), ix, iy, cx, cy };
+    if (blizko && !BD.open && BD.auto) bdOpen();
+    else if (!blizko && (scr < 0.18 || Math.hypot(cx - ix, cy - iy) > 1400)) { if (BD.open) bdClose(false); BD.auto = true; }
+  }
+  let bdW = 0; viewer.addHandler('viewport-change', () => { if (!bdW) bdW = setTimeout(() => { bdW = 0; bdWatch(); }, 300); });
+  setInterval(bdWatch, 1500);                                 // i bez pohybu pohledu (po načtení jízdních řádů, při startu z odkazu)
+  function showStation() { bdOpen(); }
   const stopAt = (ix, iy) => {                              // zastávka pod kliknutím (do ~20 px na obrazovce, nejméně 6 m)
     if (!MHD.stopPts) return null;
     const scr = viewer.viewport.getContainerSize().x / (viewer.viewport.getBounds(true).width * W);
@@ -1926,7 +2024,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
     }
   });
-  if (location.hostname === 'localhost') window.__izo = { gz, toImg, trams, skiers, MHD, mhdActive, mhdPos, cars, roads, XC, busWait, ringFree: (g) => ringFree(g), get planes() { return PLANES; } };       // ladění v lokálním náhledu
+  if (location.hostname === 'localhost') window.__izo = { BD, bdWatch, gz, toImg, trams, skiers, MHD, mhdActive, mhdPos, cars, roads, XC, busWait, ringFree: (g) => ringFree(g), get planes() { return PLANES; } };       // ladění v lokálním náhledu
   function drawSkier(q, sx, ox, oy) {
     const L = q.r.len; let i = 1; while (i < L.length - 1 && L[i] < q.s) i++;
     const a = q.r.w[i - 1], b = q.r.w[i], t = Math.max(0, Math.min(1, (q.s - L[i - 1]) / ((L[i] - L[i - 1]) || 1)));

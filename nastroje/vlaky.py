@@ -201,6 +201,10 @@ for t in v:
             trasa = trasa + pth[1:]; stat['výjezd'] += 1
     seq.sort(key=lambda q: q[0])
     if len(seq) < 2: stat['krátké'] += 1; continue
+    # vlak, který v mapě končí (cílová stanice na mapě), zůstane stát 7 min; vlak, který v mapě začíná, stojí 5 min před odjezdem (osmá položka spoje)
+    konci = k1 == len(pol) - 1 and usek[-1][0] == len(body) - 1
+    zacina = k0 == 0 and usek[0][0] == 0
+    if konci: seq.append((seq[-1][0] + 420, seq[-1][1]))
     t0 = seq[0][0]
     if seq[-1][0] - t0 > 6 * 3600: stat['moc dlouhé'] += 1; continue
     klic = tuple(trasa)
@@ -216,7 +220,7 @@ for t in v:
     zs = []
     for (i, p) in usek:
         if body[i][4]: zs += [norm(body[i][0]) + (f' (kolej {body[i][5]})' if len(body[i]) > 5 else ''), round(body[i][2] - t0)]
-    trips.append([len(routes) - 1, SI[klic], sluzba(t['bitmap'], t['od']), round(t0), sq, norm(cil), zs])
+    trips.append([len(routes) - 1, SI[klic], sluzba(t['bitmap'], t['od']), round(t0), sq, norm(cil), zs, 300 if zacina else 0])
     stat['ok'] += 1
 # ---- nákladní vlaky: náhodné průjezdy po tratích přes HK hl.n. (uhlí, autovlaky ze Škodovky, kontejnery, cisterny, dřevo) ----
 # Nejsou v jízdním řádu osobních vlaků; každý jede jen v náhodné polovině dnů (služba = množina přidaných dní), rychlostí 40–60 km/h

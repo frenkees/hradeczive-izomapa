@@ -72,6 +72,10 @@ def smer_gtfs(jmeno, sid):
     if jmeno in ('Hradec Králové-Kukleny', 'Praskačka'): return 'OPL'
     lo, la = st_pos[sid]; a = math.degrees(math.atan2((lo - _hk[0]) * 71500, (la - _hk[1]) * 110574)) % 360
     return 'PNL' if a < 45 or a >= 355 else 'HSP' if a < 135 else 'ONL' if a < 215 else 'OPL' if a < 290 else 'VSE'
+VYL = None; VYL_ST = {'Předměřice nad Labem', 'Smiřice', 'Jaroměř', 'Lochenice', 'Černožice', 'Semonice', 'Česká Skalice'}
+if os.path.exists('assets/vyluka_odjezdy.json'):
+    _p = json.load(open('assets/vyluka_odjezdy.json', encoding='utf-8'))['platnost']
+    VYL = (datetime.date.fromisoformat(_p['od']), datetime.date.fromisoformat(_p['do']))
 out, kj, pouzite = [], collections.Counter(), set()
 for tid in sorted(dotyk, key=int):
     t = trips[tid]; r = routes[t['route_id']]; pts = sorted(seq[tid])
@@ -83,6 +87,9 @@ for tid in sorted(dotyk, key=int):
         pouzite.add(sid)
     if len(body) < 2: continue
     bm = bitmap(t['service_id'])
+    # výluka HK hl.n. – Jaroměř: vlaky přes tento úsek v době výluky nejedou (nahrazuje je NAD, nastroje/vyluka_nad.py)
+    if VYL and any(q[0] == 'Hradec Králové hlavní nádraží' for q in body) and any(q[0] in VYL_ST for q in body):
+        bm = ''.join('0' if VYL[0] <= (dnes + datetime.timedelta(days=i)) <= VYL[1] else b_ for i, b_ in enumerate(bm))
     if '1' not in bm: continue
     dop = ag.get(r['agency_id'], '')
     # model soupravy: dopravce, druh a směr (Pardubice je elektrifikované, ostatní motorové), variabilita podle čísla vlaku
@@ -135,6 +142,8 @@ if KOL:
             kand += [k_ for k_ in PORADI if k_ not in kand]
         kand = [k_ for k_ in kand if k_ in KOL['koleje']]
         bm = int(v_['bitmap'][::-1], 2); od_, do_ = q[2], q[3] if q[3] >= q[2] else q[2]
+        if i == 0: od_ -= 300                                    # vlak vzniká v HK: stojí na koleji ~5 min před odjezdem
+        if i + 1 == len(b_): do_ += 420                           # vlak v HK končí: zůstane stát ~7 min
         kol = next((k_ for k_ in kand if volna(k_, bm, od_, do_)), kand[0])
         obs[kol].append((bm, od_, do_)); q.append(kol)
         v_.setdefault('kolej', {})[HL] = kol; v_['smery'] = a_ + '>' + c_

@@ -169,13 +169,16 @@ def nid(n):
     if n not in NI: NI[n] = len(names); names.append(n)
     return NI[n]
 out = []
+_vcek = {}
 # vlaky z celostátního jízdního řádu (nastroje/vlaky_vyber.py a nastroje/vlaky.py), hodí se, když GTFS vlaky nemá; druh vozidla určuje volba "vlak"
 if MESTO.get('vlak') and os.path.exists('build/vlaky/vlaky_mhd.json'):
     _v = json.load(open('build/vlaky/vlaky_mhd.json', encoding='utf-8'))
     _r, _s = len(routes), len(shapes)
     routes += _v['routes']; shapes += _v['shapes']; services.update(_v['services'])
     for t in _v['trips']:
-        z_ = t[6]; out.append([t[0] + _r, t[1] + _s, t[2], t[3], t[4], nid(t[5]), [q for i in range(0, len(z_), 2) for q in (nid(z_[i]), z_[i + 1])]])
+        z_ = t[6]
+        if len(t) > 7 and t[7]: _vcek[len(out)] = t[7]                       # vlak, který v mapě začíná, stojí před odjezdem
+        out.append([t[0] + _r, t[1] + _s, t[2], t[3], t[4], nid(t[5]), [q for i in range(0, len(z_), 2) for q in (nid(z_[i]), z_[i + 1])]])
     print('vlaků z celostátního jízdního řádu', len(_v['trips']))
 for t in trips:
     if routes[RI[t['route_id']]][1] != 2 and len(routes[RI[t['route_id']]][0]) > 4: continue   # poptávková doprava apod. bez pravidelné trasy; vlaky mají dlouhá čísla
@@ -194,6 +197,7 @@ for t in trips:
     out.append([RI[t['route_id']], SI[t['shape_id']], t['service_id'], t0, seq, nid(t['trip_headsign'] or s[-1][4]), zs])
 # čekání na konečné (q[7] = s do odjezdu, kdy vůz už stojí na první zastávce): GTFS čekání nezná, spoj začíná až odjezdem
 print('spojů s čekáním na konečné', cekani_na_konecne(out, lambda q: routes[q[0]][1]))
+for _i, _w in _vcek.items(): out[_i][7] = _w                      # čekání vlaků (cekani_na_konecne vlaky přeskakuje)
 out.sort(key=lambda q: q[3])
 # zastávky na mapě (prohlížeč z nich po kliknutí ukáže odjezdy, hledání je najde): [jméno, x, y, druh 0 tramvaj / 3 autobus]
 _obsl = {}

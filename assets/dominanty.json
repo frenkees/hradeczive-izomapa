@@ -370,7 +370,13 @@
    "w": 140,
    "h": 27,
    "top": 27,
-   "cls": "terminál MHD"
+   "cls": "terminál MHD",
+   "okluze": {
+    "w": 142,
+    "d": 78,
+    "ang": -5,
+    "h": 14.6
+   }
   }
  },
  {

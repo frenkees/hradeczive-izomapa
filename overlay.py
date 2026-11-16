@@ -87,6 +87,9 @@ streets, grounds, addr_index = [], [], []
 per_chunk = {}
 water = {}
 bus_route = None
+OKLUZE = {}                # dominanty se zadaným skutečným obrysem pro zakrývání vozidel: {jméno: {w, d, ang, h}}
+if os.path.exists('assets/dominanty.json'):
+    OKLUZE = {d_['name']: d_['spec']['okluze'] for d_ in json.load(open('assets/dominanty.json', encoding='utf-8')) if d_.get('spec', {}).get('okluze')}
 tram_lines, tram_stops = [], []
 decks = []                # mostovky silnic a tratí (svět, výška): MHD z jízdních řádů po nich jede nahoře
 # linky tramvají, když chybí jízdní řády (site/mhd.json): [konečná, konečná, počet vozů na lince]
@@ -99,6 +102,10 @@ for chunk in chunks:
 
     # budovy: obrys = konvexní obal půdorysu dole a nahoře
     for b in merge_parts(src['buildings']):
+        ok_ = OKLUZE.get(b.get('name'))
+        if ok_:                                           # skutečný obrys modelu (půdorys v datech bývá větší, stožáry vysoké): kdo jede mimo střechu, není zakrytý
+            r0_ = np.array(b['ring']).mean(axis=0); a_ = math.radians(ok_['ang']); u_ = np.array([math.cos(a_), math.sin(a_)]); v_ = np.array([-u_[1], u_[0]])
+            b = {**b, 'ring': [list(r0_ + u_ * s_ * ok_['w'] / 2 + v_ * t_ * ok_['d'] / 2) for s_, t_ in ((-1, -1), (1, -1), (1, 1), (-1, 1))], 'top': b['base'] + ok_['h']}
         ring = np.array(b['ring'])
         top = b['top'] + (22 if b['cls'] == 'kostel' else 0.6)
         pts = [px(x, y, z)[:2] for x, y in ring for z in (b['base'], top)]
@@ -167,7 +174,7 @@ for chunk in chunks:
         buildings.append({k: v for k, v in {
             'pl': pl,
             'id': f"{K}:{b['id']}", 'oid': b.get('oid'), 'hull': [[round(x), round(y)] for x, y in list(hull.exterior.coords)[:-1]], 'd': d, 'dm': dm, 'fb': fb,
-            'name': name, 'text': text, 'cls': b['cls'], 'floors': b['floors'], 'h': None if church else b['h'], 'roof': b['roof'], 'addr': b['addr'],
+            'name': name, 'text': text, 'cls': b['cls'], 'gh': 1 if ok_ else None, 'floors': b['floors'], 'h': None if church else b['h'], 'roof': b['roof'], 'addr': b['addr'],
             'lon': b['lon'], 'lat': b['lat'], 'k': K,
         }.items() if v not in (None, [], '')})
 

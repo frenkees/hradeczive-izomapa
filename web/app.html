@@ -1640,6 +1640,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   // vlaky: délky článků podle skutečných řad (Wikipedie), barvy podle jednotného schématu ČD; výška a čela jsou přibližné.
   // f / r = čelo vpředu / vzadu; deck 2 = patrový; loco = bez bočních oken. Výběr: "vlak" v mesto.json.
   const CD = { low: [18, 63, 115], body: [31, 106, 176], band: [232, 240, 246], roof: [120, 128, 136] };
+  const CDR = { low: [150, 32, 42], body: [236, 238, 240], band: [190, 38, 50], roof: [128, 132, 138] };   // bílá s červeným pruhem (RegioFox, odhad)
   const ARR = { low: [0, 92, 102], body: [0, 158, 168], band: [236, 242, 242], roof: [128, 140, 144] };
   const CDW = { low: [31, 95, 168], body: [236, 240, 242], band: [31, 95, 168], roof: [150, 156, 162] };
   const TRAINS = {
@@ -1650,6 +1651,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     os163: { h: 4.2, ...CD, nose: 1.4, cars: [{ len: 16.8, f: 1, loco: 1, top: 'panto' }, { len: 24.5 }, { len: 24.5 }, { len: 24.5, r: 1 }] },   // lokomotiva 163 a tři vozy
     regioshark2: { h: 3.9, ...CD, nose: 2.2, top: 'box', cars: [{ len: 21.6, f: 1 }, { len: 21.6, r: 1 }, { len: 21.6, f: 1 }, { len: 21.6, r: 1 }] },   // dvě jednotky 844, 87,5 m
     regionova2: { h: 3.8, ...CD, nose: 1.2, top: 'box', cars: [{ len: 14, f: 1 }, { len: 14, r: 1 }, { len: 14, f: 1 }, { len: 14, r: 1 }] },       // dvě jednotky 814, 57 m
+    regiopanter3: { h: 4.2, ...CD, nose: 2.6, top: 'box', cars: [{ len: 17.7, f: 1 }, { len: 17.7 }, { len: 17.7, r: 1 }] },   // třídílný RegioPanter (640), asi 53 m
+    regiofox: { h: 3.9, ...CDR, nose: 2.2, top: 'box', cars: [{ len: 20.8, f: 1 }, { len: 20.8, r: 1 }] },        // řada 847 RegioFox, dvoučlánková motorová jednotka
+    dmu845: { h: 3.9, ...ARR, nose: 1.6, top: 'box', cars: [{ len: 22.7, f: 1 }, { len: 22.7, r: 1 }] },          // řada 845 (Arriva), dvoučlánková motorová jednotka, ~45 m
     rychlik4: { h: 4.1, ...CD, nose: 1.4, cars: [{ len: 18, f: 1, loco: 1, top: 'panto' }, { len: 26.4 }, { len: 26.4 }, { len: 26.4 }, { len: 26.4 }, { len: 26.4 }] },   // lokomotiva a pět vozů
     flirt: { h: 4.2, ...ARR, nose: 2.4, top: 'box', cars: [{ len: 19.4, f: 1 }, { len: 19.4 }, { len: 19.4, r: 1 }] },                  // třídílná jednotka FLIRT, 58 m (Arriva)
     cityelefant: { h: 4.6, ...CDW, nose: 1.6, deck: 2, top: 'panto', cars: [{ len: 26.2, f: 1 }, { len: 26.2 }, { len: 26.2, r: 1 }] },   // řada 471, 79,2 m
@@ -2012,7 +2016,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         if (seen.has(b) || !shown(b.k)) continue; seen.add(b);
         if (b.bb[0] > bb[2] || b.bb[2] < bb[0] || b.bb[1] > bb[3] || b.bb[3] < bb[1]) continue;
         if (b.fb ? !behindFoot(b0[0], b0[1], b.fb) : !((b.dm ?? b.d) < depth(x, y, z) - 1.5)) continue;
-        out.push([4, b.hull]);                                                // 4 = budova: vozidlo za ní zůstane vidět jako průhledná silueta
+        out.push([4, b.hull, b.gh]);                                                // 4 = budova: vozidlo za ní zůstane vidět jako průhledná silueta
       }
   }
   function treeShapes(x, y, z, bb) {
@@ -2074,12 +2078,13 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       const path = new Path2D();
       for (const q of bld) { q[1].forEach((p, k) => { const [px, py] = P(p); k ? path.lineTo(px, py) : path.moveTo(px, py); }); path.closePath(); }
       ghX.globalCompositeOperation = 'destination-in'; ghX.fill(path, 'nonzero');        // jen část za budovou
-      ghX.globalCompositeOperation = 'source-in'; ghX.fillStyle = GHOST_COL; ghX.fillRect(0, 0, w, h);   // jednobarevná silueta
+      const barevne = bld.every((q) => q[2]);              // střecha z průsvitné membrány (terminál): vůz pod ní zůstane barevný, jen průsvitnější
+      if (!barevne) { ghX.globalCompositeOperation = 'source-in'; ghX.fillStyle = GHOST_COL; ghX.fillRect(0, 0, w, h); }   // jednobarevná silueta
       occX.globalCompositeOperation = 'destination-out'; occX.fill(path, 'nonzero');
     }
     occX.globalCompositeOperation = 'source-over';
     ctx.drawImage(occC, 0, 0, w, h, X0, Y0, w, h);
-    if (bld.length) { const a = ctx.globalAlpha; ctx.globalAlpha = GHOST_A; ctx.drawImage(ghC, 0, 0, w, h, X0, Y0, w, h); ctx.globalAlpha = a; }
+    if (bld.length) { const a = ctx.globalAlpha; ctx.globalAlpha = bld.every((q) => q[2]) ? 0.8 : GHOST_A; ctx.drawImage(ghC, 0, 0, w, h, X0, Y0, w, h); ctx.globalAlpha = a; }
   }
   const ghC = document.createElement('canvas'), ghX = ghC.getContext('2d'), GHOST_COL = '#1b2333', GHOST_A = 0.35;
   // vlak po článcích podle koleje, vzdálenější článek první, aby ho bližší zakryl

@@ -94,14 +94,17 @@ for tid in sorted(dotyk, key=int):
     dop = ag.get(r['agency_id'], '')
     # model soupravy: dopravce, druh a směr (Pardubice je elektrifikované, ostatní motorové), variabilita podle čísla vlaku
     h_ = int(hashlib.md5((r['route_short_name'] + (t.get('trip_short_name') or '') + t['trip_id']).encode()).hexdigest(), 16) % 100
-    if 'ARRIVA' in dop.upper(): model = 'flirt'
+    # skutečné soupravy (průzkum GVD 2025/26): R10 Praha–HK–Trutnov = lokomotiva 362 + 5 vozů, Arriva R14A = řada 845, Sp = RegioFox 847,
+    # Os Pardubice–Jaroměř = RegioPanter (třídílný), Os Chlumec n. C. – Kolín = RegioPanter 650 (dvoučlánkový), východní větve = RegioFox / RegioPanter
+    jm = [q[0] for q in body]
+    ma = lambda ks: any(k in n for n in jm for k in ks)
+    if 'ARRIVA' in dop.upper(): model = 'dmu845'
     elif druh(r['route_short_name']) in ('157', '122', '63', '69', '50'):
-        model = 'rychlik4' if h_ < 45 else 'rychlik'
-    else:
-        konce = {smer_gtfs(q[0], q[1]) for q in (body[0], body[-1]) if q[0] != HL_N}
-        if 'ONL' in konce: model = 'regiopanter' if h_ < 55 else 'cityelefant' if h_ < 80 else 'os163'
-        elif 'PNL' in konce or 'HSP' in konce: model = 'regioshark' if h_ < 40 else 'regioshark2' if h_ < 55 else 'regionova' if h_ < 80 else 'regionova2' if h_ < 90 else 'vuz810'
-        else: model = 'regionova' if h_ < 35 else 'regioshark' if h_ < 65 else 'regiopanter' if h_ < 85 else 'regionova2'
+        model = ('rychlik4' if h_ < 80 else 'rychlik') if ma(('Praha', 'Kolín', 'Pardubice')) else 'regiofox'
+    elif ma(('Chlumec nad Cidlinou', 'Velký Osek', 'Kolín')): model = 'regiopanter'
+    elif ma(('Pardubice',)): model = 'regiopanter3' if h_ < 70 else 'regiofox'
+    elif ma(('Týniště', 'Choceň', 'Letohrad', 'Rychnov', 'Náchod', 'Broumov', 'Meziměstí', 'Hronov', 'Častolovice')): model = 'regiofox' if h_ < 80 else 'regiopanter'
+    else: model = 'regiofox' if h_ < 75 else 'regiopanter3'
     out.append({'cislo': r['route_short_name'] + ' ' + (t.get('trip_short_name') or t['trip_id']), 'druh': druh(r['route_short_name']), 'typ': '11', 'dop': dop_kod(dop),
                 'model': model, 'bitmap': bm, 'od': dnes.isoformat() + 'T00:00:00', 'do': dny[-1].isoformat() + 'T00:00:00', 'body': body, 'dopravce': dop, 'headsign': t['trip_headsign']})
     kj[(druh(r['route_short_name']), dop)] += 1

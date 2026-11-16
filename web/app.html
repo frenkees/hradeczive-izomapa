@@ -1417,7 +1417,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     }
     const fronta = {};                                     // víc vozů na téže konečné: kdo odjíždí později, stojí za ním (a[3] = pořadí)
     for (const a of out.filter((q) => q[2]).sort((p, q) => p[2] - q[2])) {
-      const t = MHD.trips[a[0]], k = `${MHD.routes[t[0]][1]}_${t[6][0]}`;
+      const t = MHD.trips[a[0]], TM = MHD.terminal, jeT = TM && t[6][0] === TM.name && MHD.routes[t[0]][1] !== 2;
+      if (jeT && a[2] > TM.lay) { a[3] = 0; continue; }       // terminál: dlouho čekající vůz stojí na odstavném místě, ne ve frontě
+      const k = jeT ? 'T' : `${MHD.routes[t[0]][1]}_${t[6][0]}`;
       a[3] = fronta[k] = (fronta[k] ?? -1) + 1;
     }
     return out;
@@ -1501,6 +1503,20 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     if (MHD.follow !== null) { MHD.follow = null; if (MHD.route === null) $('follow').hidden = true; }   // trasa zůstane nakreslená
     if (typeof PLANES !== 'undefined' && PLANES.follow !== null) { PLANES.follow = null; $('follow').hidden = true; }
   });
+  function terminalPos(i, trip, o, ceka, poradi) {         // autobus na terminálu: dlouho čeká na odstavném místě, před odjezdem přejede na nástupiště (pruh pod střechou), další vozy stojí v pruhu za ním
+    const T = MHD.terminal, mk = (x, y, dx, dy, noBld) => { const z = gz(x, y), [ix, iy] = toImg(x, y, z); return { x, y, z, ix, iy, dx, dy, dirSign: 1, noBld }; };
+    let bay = o;
+    if (poradi) { const L_ = Math.hypot(o.dx, o.dy) || 1, d_ = poradi * 16; bay = mk(o.x - o.dx / L_ * d_, o.y - o.dy / L_ * d_, o.dx, o.dy); }
+    const sp = T.spots[i % T.spots.length], spot = mk(sp[0], sp[1], sp[2], sp[3], true);
+    if (ceka > T.lay) return spot;
+    const tt = Math.min(T.lay, trip[7] || T.lay) - ceka, dur = 30;
+    if (tt >= dur) return bay;
+    const P = [[spot.x, spot.y], T.entry, [bay.x, bay.y]], len = [0, Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1])];
+    len.push(len[1] + Math.hypot(P[2][0] - P[1][0], P[2][1] - P[1][1]));
+    const u = tt / dur, s = (u * u * (3 - 2 * u)) * len[2], k = s <= len[1] ? 1 : 2, f = (s - len[k - 1]) / ((len[k] - len[k - 1]) || 1);
+    const a = P[k - 1], b = P[k];
+    return mk(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, b[0] - a[0], b[1] - a[1], k === 1);
+  }
   function odstavPos(trip, ceka, poradi) {                 // tramvaj na konečné, kde kolej za zastávkou slepě končí: z nástupiště dozadu na konec koleje, před odjezdem zpátky
     const pole = MHD.odstav && MHD.odstav[trip[1]];
     if (!pole) return null;
@@ -1593,7 +1609,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
       }
     }
   });
-  if (location.hostname === 'localhost') window.__izo = { trams, skiers, MHD, mhdActive, mhdPos, cars, roads, XC, busWait, ringFree: (g) => ringFree(g), get planes() { return PLANES; } };       // ladění v lokálním náhledu
+  if (location.hostname === 'localhost') window.__izo = { gz, toImg, trams, skiers, MHD, mhdActive, mhdPos, cars, roads, XC, busWait, ringFree: (g) => ringFree(g), get planes() { return PLANES; } };       // ladění v lokálním náhledu
   function drawSkier(q, sx, ox, oy) {
     const L = q.r.len; let i = 1; while (i < L.length - 1 && L[i] < q.s) i++;
     const a = q.r.w[i - 1], b = q.r.w[i], t = Math.max(0, Math.min(1, (q.s - L[i - 1]) / ((L[i] - L[i - 1]) || 1)));
@@ -2025,9 +2041,10 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     return out;
   }
   const occC = document.createElement('canvas'), occX = occC.getContext('2d');
-  function drawBehindTrees(img, ix, iy, iw, ih, x, y, z, sx, ox, oy) {
+  function drawBehindTrees(img, ix, iy, iw, ih, x, y, z, sx, ox, oy, noBld) {
     const X0 = Math.round(ox + ix * sx), Y0 = Math.round(oy + iy * sx), w = Math.round(iw * sx), h = Math.round(ih * sx);
-    const sh = treeShapes(x, y, z, [ix, iy, ix + iw, iy + ih]);
+    let sh = treeShapes(x, y, z, [ix, iy, ix + iw, iy + ih]);
+    if (noBld) sh = sh.filter((q) => q[0] !== 4);          // odstavné místo mimo budovu: obrys budovy (konvexní obal se stožáry) vůz nezakrývá
     if (!sh.length) { ctx.drawImage(img, X0, Y0, w, h); return; }
     if (occC.width < w || occC.height < h) { occC.width = Math.max(occC.width, w); occC.height = Math.max(occC.height, h); }
     occX.clearRect(0, 0, w, h); occX.imageSmoothingEnabled = false; occX.globalCompositeOperation = 'source-over';
@@ -2098,7 +2115,7 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
     const base = toImg(cxw, cyw, h0);
     const nd = ndirOf(isBus), k = ((Math.round(Math.atan2(fy_, fx_) / (Math.PI * 2) * nd) % nd) + nd) % nd;
     const spr = vehicleSprite(col, k, isBus, len, wid, state.season === 'winter');
-    drawBehindTrees(spr.c, base[0] + spr.x0, base[1] + spr.y0, spr.c.width, spr.c.height, cxw, cyw, h0, sx, ox, oy);
+    drawBehindTrees(spr.c, base[0] + spr.x0, base[1] + spr.y0, spr.c.width, spr.c.height, cxw, cyw, h0, sx, ox, oy, o.noBld);
     if (night > 0.3 && !o.noLights && sx >= LIGHTS_SX) {                                    // světla jen při přiblížení; kreslí se najednou (flushLights)
       const P = (s, t, h) => { const p = toImg(cxw + fx_ * s + sxv * t, cyw + fy_ * s + syv * t, h0 + h); return [ox + p[0] * sx, oy + p[1] * sx]; };
       const l = len / 2, w = wid / 2;
@@ -2711,8 +2728,9 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
         if (sx > 0.12) for (const [i, el, ceka, poradi] of MHD.act) {
           const trip = MHD.trips[i], [line, typ] = MHD.routes[trip[0]];
           let o = mhdPos(trip, ceka ? 0 : el + (now / 1000 - ns) - (typ === 2 ? 0 : busDelay(i, trip, el + (now / 1000 - ns), dt)));   // na konečné stojí
-          const ods = ceka && typ === 0 ? odstavPos(trip, ceka, poradi) : null;
+          const ods = ceka && typ === 0 ? odstavPos(trip, ceka, poradi) : null, jeT = ceka && typ !== 2 && MHD.terminal && trip[6][0] === MHD.terminal.name;
           if (ods) o = ods;
+          else if (jeT) o = terminalPos(i, trip, o, ceka, poradi);
           else if (poradi) {                                     // další vůz ve frontě na konečné: o délku vozu (s mezerou) za předchozím
             const L_ = Math.hypot(o.dx, o.dy) || 1, d_ = poradi * (typ === 0 ? 36 : 16), x_ = o.x - o.dx / L_ * d_, y_ = o.y - o.dy / L_ * d_, z_ = gz(x_, y_), [ix_, iy_] = toImg(x_, y_, z_);
             o = { ...o, x: x_, y: y_, z: z_, ix: ix_, iy: iy_ };

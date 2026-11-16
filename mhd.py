@@ -195,6 +195,24 @@ for t in trips:
         if d > a: seq += [d - t0, round(dist * k)]              # pobyt v zastávce
         zs += [nid(nm), a - t0]
     out.append([RI[t['route_id']], SI[t['shape_id']], t['service_id'], t0, seq, nid(t['trip_headsign'] or s[-1][4]), zs])
+# terminál (assets/terminal_hd.json): odjezdová nástupiště jsou pod střechou, tvar spoje ale začíná u výstupní zastávky; vůz začíná na nástupišti (vzdálenost 0 -> místo v pruhu)
+TERM = json.load(open('assets/terminal_hd.json', encoding='utf-8')) if os.path.exists('assets/terminal_hd.json') else None
+if TERM:
+    _bx0, _bx1, _by0, _by1 = TERM['box']; _dbay, _n = {}, 0
+    for q in out:
+        if routes[q[0]][1] == 2 or names[q[6][0]] != TERM['name'] or len(q[4]) < 4: continue
+        if q[1] not in _dbay:
+            _w = shapes[q[1]]; _d = None; _c = 0.0
+            for (_ax, _ay), (_bx, _by) in zip(_w, _w[1:]):
+                _l = math.dist((_ax, _ay), (_bx, _by))
+                for _k in range(int(_l) + 1):
+                    _u = _k / (_l or 1); _x, _y = _ax + (_bx - _ax) * _u, _ay + (_by - _ay) * _u
+                    if _bx0 <= _x <= _bx1 and _by0 <= _y <= TERM['bay_y']: _d = _c + _k; break
+                if _d is not None: break
+                _c += _l
+            _dbay[q[1]] = _d or 0
+        if q[4][1] == 0 and _dbay[q[1]] > 0: q[4][1] = min(_dbay[q[1]], q[4][3]); _n += 1
+    print('spojů začínajících na nástupišti terminálu', _n)
 # čekání na konečné (q[7] = s do odjezdu, kdy vůz už stojí na první zastávce): GTFS čekání nezná, spoj začíná až odjezdem
 print('spojů s čekáním na konečné', cekani_na_konecne(out, lambda q: routes[q[0]][1]))
 for _i, _w in _vcek.items(): out[_i][7] = _w                      # čekání vlaků (cekani_na_konecne vlaky přeskakuje)
@@ -247,6 +265,6 @@ for _sh in sorted({q[1] for q in out if routes[q[0]][1] == 0 and len(q) > 7 and 
         if len(_vyber) == 2: break
     if _vyber: odstav[str(_sh)] = [[[round(float(_a), 1), round(float(_b), 1)] for _a, _b in _o] for _o in _vyber]
 print('tvarů s odstavem na konečné', len(odstav))
-json.dump({'routes': routes, 'shapes': shapes, 'services': services, 'trips': out, 'names': names, 'odstav': odstav, 'stops': stops, 'kvalita': kval,
+json.dump({'routes': routes, 'shapes': shapes, 'services': services, 'trips': out, 'names': names, 'odstav': odstav, 'terminal': ({**TERM, 'name': NI.get(TERM['name'])} if TERM else None), 'stops': stops, 'kvalita': kval,
            'feed': next(iter(T('feed_info')), {}).get('feed_version', '') if 'feed_info.txt' in zf.namelist() else time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime(Z)))}, open('site/mhd.json', 'w', encoding='utf-8'), separators=(',', ':'), ensure_ascii=False)
 print('linek', len(routes), 'tras', len(shapes), 'spojů', len(out), 'kB', os.path.getsize('site/mhd.json') // 1000)

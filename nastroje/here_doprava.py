@@ -124,29 +124,40 @@ def ids_json():
 
 
 def prirad(roads, tol=8.0):
-    """silnicím z overlay.py (r['w'] ve společných souřadnicích) přidá r['h'] podle úseků HERE; vrací počet přiřazených silnic"""
-    if not os.path.exists(REG): return 0
+    """silnicím z overlay.py (r['w'] ve společných souřadnicích) přidá r['h'] podle úseků HERE a TomTom (nastroje/tomtom_doprava.py, čísla s posunem);
+    vrací počet přiřazených silnic. Na jednosměrkách se bere jen úsek ve směru jízdy; počty shod a neshod směru (kontrola, že pořadí bodů úseku
+    sleduje směr jízdy) vypíše do prirad.stat."""
     import shapely
     from shapely.geometry import LineString
     from shapely.strtree import STRtree
-    reg = registr()['seg']
-    if not reg: return 0
-    lines = [LineString(s['w']) for s in reg]; tree = STRtree(lines); ok = 0
+    zdroje = []
+    if os.path.exists(REG) and registr()['seg']: zdroje.append(('here', registr()['seg'], 0))
+    try:
+        import tomtom_doprava as _tt
+        if os.path.exists(_tt.REG) and _tt.registr()['seg']: zdroje.append(('tomtom', _tt.registr()['seg'], _tt.ID_POSUN))
+    except ImportError: pass
+    if not zdroje: return 0
+    prep = [(nm, [LineString(s['w']) for s in reg], off) for nm, reg, off in zdroje]
+    trees = [STRtree(ls) for _, ls, _ in prep]
+    prirad.stat = {nm: [0, 0] for nm, _, _ in prep}; ok = 0
     for r in roads:
         w = r.get('w') or []
         if len(w) < 2 or r.get('c') in ('service', 'track', 'footway', 'path', 'cycleway', 'steps', 'pedestrian'): continue
         rl = LineString([(p[0], p[1]) for p in w])
         if rl.length < 3: continue
         zona = rl.buffer(tol); h = []
-        for i in tree.query(zona):
-            sl = lines[i]
-            ov = sl.intersection(zona).length                     # kolik úseku HERE leží na této silnici
-            if ov < min(0.5 * rl.length, 0.5 * sl.length, 40): continue
-            a0, a1 = rl.project(shapely.Point(sl.coords[0])), rl.project(shapely.Point(sl.coords[-1]))
-            if abs(a1 - a0) < 3: continue
-            proti = a1 < a0
-            if r.get('o') and (proti != (r['o'] < 0)): continue    # jednosměrka: jen úsek ve směru jízdy
-            h.append(int(i) * 2 + (1 if proti else 0))
+        for (nm, lines, off), tree in zip(prep, trees):
+            for i in tree.query(zona):
+                sl = lines[i]
+                ov = sl.intersection(zona).length                     # kolik úseku leží na této silnici
+                if ov < min(0.5 * rl.length, 0.5 * sl.length, 40): continue
+                a0, a1 = rl.project(shapely.Point(sl.coords[0])), rl.project(shapely.Point(sl.coords[-1]))
+                if abs(a1 - a0) < 3: continue
+                proti = a1 < a0
+                if r.get('o'):
+                    shoda = proti == (r['o'] < 0); prirad.stat[nm][0 if shoda else 1] += 1
+                    if not shoda: continue                             # jednosměrka: jen úsek ve směru jízdy
+                h.append((off + int(i)) * 2 + (1 if proti else 0))
         if h: r['h'] = sorted(set(h)); ok += 1
     return ok
 

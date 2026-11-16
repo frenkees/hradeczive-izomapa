@@ -24,6 +24,8 @@ mkdir -p site/tiles
 for s in summer autumn winter spring; do node render.mjs mpp=0.2 dir=build season=$s alpha=1 stromy=site/stromy > /dev/null; done   # kresby stromů: auta se schovají přesně za ně
 python preview.py
 python overlay.py
+[ -f assets/here_segmenty.json ] && python nastroje/here_doprava.py ids || true       # klíče úseků dopravy (HERE, pak TomTom) pro prohlížeč
+[ -f assets/tomtom_segmenty.json ] && python nastroje/tomtom_doprava.py ids || true
 python mhd.py || echo "VAROVÁNÍ: mhd.py selhal (jízdní řády se neobnovily, viz výpis výše)"   # jízdní řády jen když je v mesto.json mhd.gtfs
 python set_status.py hotovo
 python build_html.py

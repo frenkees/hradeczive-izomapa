@@ -719,6 +719,7 @@ function roofDeco(b, X, eave, rc) {
   world.add(new THREE.Mesh(geom(X), solidMat));
 }
 
+const RAIL_DECKS = [];   // osy kolejí na mostovkách [[x, y, z], ...] (plní mosty, kreslí blok železnice)
 // ---------- mobiliář, auta, ploty ----------
 {
   const P = scene.props;
@@ -1030,7 +1031,7 @@ function roofDeco(b, X, eave, rc) {
   (scene.bridges || []).forEach((br, bi) => {
     const hw = br.w / 2, foot = br.k === 'foot', rail = br.k === 'rail';
     const th = foot ? 0.45 : 1.1, W = [0, 1, 1, 0];
-    const top = rail ? [0.46, 0.43, 0.39] : foot ? (SEASON_ID === 3 ? [0.86, 0.88, 0.92] : [0.62, 0.56, 0.47]) : [0.38, 0.39, 0.42];
+    const top = rail ? (SEASON_ID === 3 ? [0.84, 0.86, 0.90] : [0.58, 0.55, 0.50]) : foot ? (SEASON_ID === 3 ? [0.86, 0.88, 0.92] : [0.62, 0.56, 0.47]) : [0.38, 0.39, 0.42];
     const side = foot ? [0.52, 0.47, 0.40] : [0.70, 0.69, 0.66], rcol = foot ? [0.24, 0.25, 0.27] : [0.78, 0.77, 0.74];
     const EMB = 2.5, grass = [[122, 176, 80], [106, 160, 74], [122, 154, 72], [228, 232, 238]][SEASON_ID].map((v) => v / 255);
     const A = (x, y, z) => tv(x, y, z);
@@ -1039,6 +1040,7 @@ function roofDeco(b, X, eave, rc) {
     for (const q of br.p) if (!P.length || Math.hypot(q[0] - P[P.length - 1][0], q[1] - P[P.length - 1][1]) > 0.3) P.push([...q]);
     if (P.length < 2) return;
     for (let it = 0; it < 3; it++) { const z = P.map((q) => q[2]); for (let i = 1; i < P.length - 1; i++) P[i][2] = Math.max(0.25 * z[i - 1] + 0.5 * z[i] + 0.25 * z[i + 1], P[i][3] + 0.15); }
+    if (rail) RAIL_DECKS.push(P.map((q) => [q[0], q[1], q[2]]));        // pražce a kolejnice na mostovce kreslí blok železnice
     // směry úseků a kolmice v bodech (pokos: na ohybu se sousední úseky potkají ve stejném rohu, bez mezer a překryvů)
     const U = [], M = [];
     for (let i = 0; i < P.length - 1; i++) { const dx = P[i + 1][0] - P[i][0], dy = P[i + 1][1] - P[i][1], l = Math.hypot(dx, dy); U.push([dx / l, dy / l, l]); }
@@ -1066,11 +1068,6 @@ function roofDeco(b, X, eave, rc) {
         const t0 = d / len, t1 = Math.min(1, (d + 3) / len), q = 0.12;
         const ax = x0 + (x1 - x0) * t0, ay = y0 + (y1 - y0) * t0, az = z0 + (z1 - z0) * t0 + 0.03, bx = x0 + (x1 - x0) * t1, by = y0 + (y1 - y0) * t1, bz = z0 + (z1 - z0) * t1 + 0.03;
         pushQuad(L, A(ax - uy * q, ay + ux * q, az), A(ax + uy * q, ay - ux * q, az), A(bx + uy * q, by - ux * q, bz), A(bx - uy * q, by + ux * q, bz), [0.92, 0.92, 0.88], [0, 0, 0, 0]);
-      }
-      if (rail) for (const o of [-0.75, 0.75]) {
-        const k0 = o / hw, k1 = o / hw;
-        pushQuad(L, A(x0 + n0[0] * k0 - uy * 0.07, y0 + n0[1] * k0 + ux * 0.07, z0 + 0.12), A(x0 + n0[0] * k0 + uy * 0.07, y0 + n0[1] * k0 - ux * 0.07, z0 + 0.12),
-          A(x1 + n1[0] * k1 + uy * 0.07, y1 + n1[1] * k1 - ux * 0.07, z1 + 0.12), A(x1 + n1[0] * k1 - uy * 0.07, y1 + n1[1] * k1 + ux * 0.07, z1 + 0.12), [0.30, 0.29, 0.28], [0, 0, 0, 0]);
       }
       const ext = [1, -1].map((sg) => !covered(bi, (x0 + x1) / 2 + (n0[0] + n1[0]) / 2 * sg * (1 + 0.5 / hw), (y0 + y1) / 2 + (n0[1] + n1[1]) / 2 * sg * (1 + 0.5 / hw), (z0 + z1) / 2));   // volná hrana?
       if (Math.max(z0 - g0, z1 - g1) < (br.wtr ? 0.32 : EMB)) {                                                                         // násyp (u mostů přes vodu jen konce)
@@ -1124,6 +1121,151 @@ function roofDeco(b, X, eave, rc) {
   if (wires.length) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3));
     world.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: LIGHTS ? 0x000000 : 0x2a2a2e })));
+  }
+}
+
+// ---------- železnice: štěrkové lože, pražce a kolejnice (prep.py: scene.koleje; na mostovkách RAIL_DECKS) ----------
+// Jeden mesh, jeden materiál. aw = [druh, u, -, bez ořezu]: 0 lože, 1 pás pražců (u = pořadí pražce podél koleje),
+// 2 kolejnice a drobnosti (barva z vrcholu). Pražce kreslí shader s filtrem podle velikosti pixelu: při rozteči pod ~2 px
+// splynou do průměrné barvy místo moaré. Kolejnice jsou aspoň 1 px široké (podle kamery a MPP) a mají tmavší bok k divákovi.
+{
+  const K = scene.koleje;
+  if ((K && K.o.length) || RAIL_DECKS.length) {
+    const B = newBuf(), ST = scene.step;
+    const gz = (x, y) => {                       // výška terénu přesně podle trojúhelníků sítě terénu
+      const fc = (x + HALF) / ST + MS, fr = (HALF - y) / ST + MS;
+      const c = Math.max(0, Math.min(NE - 2, Math.floor(fc))), r = Math.max(0, Math.min(NE - 2, Math.floor(fr)));
+      const fx = Math.max(0, Math.min(1, fc - c)), fy = Math.max(0, Math.min(1, fr - r));
+      const a = HX[r * NE + c], b = HX[r * NE + c + 1], d = HX[(r + 1) * NE + c], e = HX[(r + 1) * NE + c + 1];
+      return fx + fy <= 1 ? a + (b - a) * fx + (d - a) * fy : e + (d - e) * (1 - fx) + (b - e) * (1 - fy);
+    };
+    // úroveň koleje: nejvyšší terén napříč (v zářezu by jinak terén na kraji prorazil pražce)
+    const lvl = (x, y, nx, ny, w) => Math.max(gz(x, y), gz(x + nx * w, y + ny * w), gz(x - nx * w, y - ny * w), gz(x + nx * w / 2, y + ny * w / 2), gz(x - nx * w / 2, y - ny * w / 2));
+    const dens = (P, stp) => {                   // body po nejvýš stp m, další složky bodu se interpolují
+      const out = [P[0]];
+      for (let i = 1; i < P.length; i++) {
+        const a = P[i - 1], b = P[i], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / stp));
+        for (let k = 1; k <= n; k++) out.push(a.map((v, j) => v + (b[j] - v) * k / n));
+      }
+      return out;
+    };
+    const nrm = (P) => P.map((_, i) => {         // jednotková kolmice doleva v každém bodě
+      const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+      return [-dy / l, dx / l];
+    });
+    const quadA = (a, b, c, d, col, wa, wb, wc, wd) => { pushTri(B, a, b, c, col, [wa, wb, wc]); pushTri(B, a, c, d, col, [wa, wc, wd]); };
+    const pairs = (flat, k) => { const o = []; for (let i = 0; i + k <= flat.length; i += k) o.push(flat.slice(i, i + k)); return o; };
+    // průmět vodorovného vektoru (východ, sever) do obrazu
+    const camR = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), camU = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+    const scr = (x, y) => [x * camR.x - y * camR.z, x * camU.x - y * camU.z];
+    const camV = [camDir.x, -camDir.z];          // směr ke kameře v rovině (východ, sever)
+    const minHw = (dx, dy) => {                  // půlšířka pásu ve směru (dx, dy), aby měl v obraze aspoň 1 px
+      const l = Math.hypot(dx, dy) || 1, t = scr(dx / l, dy / l), tl = Math.hypot(...t), o = scr(-dy / l, dx / l);
+      const cr = Math.abs(t[0] * o[1] - t[1] * o[0]) / tl;
+      return MPP * Math.max(Math.abs(t[0]), Math.abs(t[1])) / tl / (2 * Math.max(cr, 1e-3)) * 1.05;
+    };
+    const DROP = Math.max(0.2, 1.1 * MPP / Math.cos(EL));        // bok kolejnice: aspoň 1 px pod hlavou
+    // kolejnice: body [x, y, z, f], f = 1 na pražcích (bok se kreslí), 0 v přejezdu
+    const rail = (P, hw0, top, side, nc) => {
+      for (let i = 0; i < P.length - 1; i++) {
+        const [x0, y0, z0, f0] = P[i], [x1, y1, z1, f1] = P[i + 1], dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy); if (l < 0.02) continue;
+        const hw = Math.max(hw0, minHw(dx, dy)), nx = -dy / l * hw, ny = dx / l * hw, aw = [2, 0, 0, nc];
+        quadA(tv(x0 + nx, y0 + ny, z0), tv(x0 - nx, y0 - ny, z0), tv(x1 - nx, y1 - ny, z1), tv(x1 + nx, y1 + ny, z1), top, aw, aw, aw, aw);
+        if (f0 + f1 < 0.5) continue;
+        const sg = nx * camV[0] + ny * camV[1] > 0 ? 1 : -1, ex = nx * sg, ey = ny * sg, d0 = DROP * f0, d1 = DROP * f1;
+        quadA(tv(x0 + ex, y0 + ey, z0), tv(x1 + ex, y1 + ey, z1), tv(x1 + ex, y1 + ey, z1 - d1), tv(x0 + ex, y0 + ey, z0 - d0), side, aw, aw, aw, aw);
+      }
+    };
+    const STEEL = [0.72, 0.72, 0.74], RUST = [0.42, 0.35, 0.30], FROG = [0.50, 0.50, 0.53];
+    const SL_HW = 1.3, BED_T = 1.7, BED_O = 2.3;
+    if (K) {
+      // štěrkové lože kolem os kolejí, mimo přejezdy
+      K.o.forEach((flat, ci) => {
+        const P0 = pairs(flat, 2), cum = [0];
+        for (let i = 1; i < P0.length; i++) cum.push(cum[i - 1] + Math.hypot(P0[i][0] - P0[i - 1][0], P0[i][1] - P0[i - 1][1]));
+        const Lc = cum[cum.length - 1], xs = pairs(K.x[ci] || [], 2), runs = [];
+        let a = 0;
+        for (const [s0, s1] of xs) { if (s0 > a) runs.push([a, s0]); a = Math.max(a, s1); }
+        if (Lc > a) runs.push([a, Lc]);
+        const at = (s) => { let i = 1; while (i < cum.length - 1 && cum[i] < s) i++; const t = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [P0[i - 1][0] + (P0[i][0] - P0[i - 1][0]) * t, P0[i - 1][1] + (P0[i][1] - P0[i - 1][1]) * t]; };
+        for (const [s0, s1] of runs) {
+          if (s1 - s0 < 0.3) continue;
+          const sub = [at(s0), ...P0.filter((_, i) => cum[i] > s0 && cum[i] < s1), at(s1)];
+          const P = dens(sub, 2.5), N_ = nrm(P);
+          let pv = null;
+          P.forEach(([x, y], i) => {
+            const [nx, ny] = N_[i], zt = lvl(x, y, nx, ny, SL_HW) + 0.2;
+            const v = [BED_T, -BED_T, BED_O, -BED_O].map((o, k) => { const px = x + nx * o, py = y + ny * o; return tv(px, py, k < 2 ? Math.max(zt, gz(px, py) + 0.08) : gz(px, py) - 0.05); });
+            const W = [0, 0, 0, 0];
+            if (pv) {
+              quadA(pv[0], pv[1], v[1], v[0], [1, 1, 1], W, W, W, W);
+              quadA(pv[2], pv[0], v[0], v[2], [1, 1, 1], W, W, W, W);
+              quadA(pv[1], pv[3], v[3], v[1], [1, 1, 1], W, W, W, W);
+            }
+            pv = v;
+          });
+        }
+      });
+      // pásy pražců: čáry mezi pražci [Lx, Ly, Rx, Ry, u]
+      for (const flat of K.s) {
+        const Q = pairs(flat, 5).map(([lx, ly, rx, ry, u]) => {
+          const z = Math.max(...[0, 0.25, 0.5, 0.75, 1].map((t) => gz(lx + (rx - lx) * t, ly + (ry - ly) * t))) + 0.32;
+          return [tv(lx, ly, z), tv(rx, ry, z), [1, u, 0, 0]];
+        });
+        for (let i = 0; i < Q.length - 1; i++) quadA(Q[i][0], Q[i][1], Q[i + 1][1], Q[i + 1][0], [1, 1, 1], Q[i][2], Q[i][2], Q[i + 1][2], Q[i + 1][2]);
+      }
+      // kolejnice, přídržnice (1) a srdcovky (2)
+      for (const r of K.r) {
+        const typ = r[0], P0 = pairs(r.slice(1), 3);
+        const P = dens(P0, 2.5), N_ = nrm(P), top = [0.55, 0.50, 0.52][typ];
+        rail(P.map(([x, y, f], i) => [x, y, lvl(x, y, N_[i][0], N_[i][1], 2.05) + 0.06 + (top - 0.06) * f, f]), [0.036, 0.03, 0.09][typ], typ === 2 ? FROG : STEEL, RUST, 0);
+      }
+      for (const [x, y, a] of K.pm || []) pushBox(B, frameAt(x, y, gz(x, y) + 0.15, a), -0.45, 0.45, -0.22, 0.22, 0, 0.35, [0.34, 0.36, 0.33], [2, 0, 0, 0]);
+    }
+    // koleje na mostovkách: pražce a kolejnice na desce (výška z mostovky)
+    for (const D of RAIL_DECKS) {
+      const P = dens(D, 2.5), N_ = nrm(P);
+      let s = 0;
+      const Q = P.map(([x, y, z], i) => {
+        if (i) s += Math.hypot(x - P[i - 1][0], y - P[i - 1][1]);
+        const [nx, ny] = N_[i], aw = [1, s / 0.6, 0, 1];
+        return [tv(x + nx * SL_HW, y + ny * SL_HW, z + 0.1), tv(x - nx * SL_HW, y - ny * SL_HW, z + 0.1), aw];
+      });
+      for (let i = 0; i < Q.length - 1; i++) quadA(Q[i][0], Q[i][1], Q[i + 1][1], Q[i + 1][0], [1, 1, 1], Q[i][2], Q[i][2], Q[i + 1][2], Q[i + 1][2]);
+      for (const o of [0.7525, -0.7525]) rail(P.map(([x, y, z], i) => [x + N_[i][0] * o, y + N_[i][1] * o, z + 0.33, 1]), 0.036, STEEL, RUST, 1);
+    }
+    const lmap = await new THREE.TextureLoader().loadAsync(`${DIR}/lightmap.png`);
+    lmap.magFilter = lmap.minFilter = THREE.LinearFilter; lmap.generateMipmaps = false; lmap.colorSpace = THREE.NoColorSpace;
+    world.add(new THREE.Mesh(geom(B), mat(/* glsl */`
+      uniform sampler2D uLmap; uniform float uHalf;
+      varying vec3 vC; varying vec3 vN; varying vec3 vW; varying vec4 vA;
+      float pI(float x, float w){ return floor(x) * w + min(fract(x), w); }      // integrál pulsů šířky w s periodou 1
+      void main(){
+        if (vA.w < 0.5 && (abs(vW.x) > uHalf || abs(vW.z) > uHalf)) discard;  // jen vlastní čtverec (jako textura terénu)
+        if (uLights > 0.5) {
+          if (vA.w > 0.5) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+          float l = texture2D(uLmap, vec2((vW.x + uHalf) / (2.0 * uHalf), (uHalf - vW.z) / (2.0 * uHalf))).r;
+          l = floor(l * 5.0 + hash(floor(gl_FragCoord.xy)) * 0.9) / 5.0;
+          gl_FragColor = vec4(vec3(1.0, 0.76, 0.42) * l * 0.85, 1.0); return;
+        }
+        vec3 col = vC;
+        if (vA.x < 1.5) {
+          vec3 bal = winter() ? vec3(0.88, 0.90, 0.94) : uSeason > 1.5 ? vec3(0.63, 0.59, 0.53) : vec3(0.67, 0.63, 0.57);
+          col = bal * (0.93 + 0.12 * hash(floor((vW.xz + uOff) * 4.0)));                // štěrk
+          if (vA.x > 0.5) {
+            // pražec uprostřed buňky u..u+1 (šířka 0,26 m z rozteče 0,6 m), plocha pixelu se zprůměruje
+            float w = 0.43, x = vA.y - 0.5 + w * 0.5, f = max(length(vec2(dFdx(vA.y), dFdy(vA.y))), 1e-3);
+            float cov = clamp((pI(x + f * 0.5, w) - pI(x - f * 0.5, w)) / f, 0.0, 1.0);
+            vec3 sl = winter() ? vec3(0.70, 0.71, 0.74) : vec3(0.43, 0.39, 0.35);
+            col = mix(col, sl, cov);
+          }
+        }
+        vec3 n = fn(normalize(vN));
+        float d = max(dot(n, uSun), 0.0), s = shadow(vW, n);
+        col *= (0.80 + 0.22 * floor(d * 6.0 + 0.5) / 6.0) * (s > 0.5 ? 1.0 : 0.74);
+        if (s < 0.5) col *= vec3(0.92, 0.96, 1.08);
+        gl_FragColor = vec4(col, 1.0);
+      }`, { uLmap: { value: lmap }, uHalf: { value: HALF } }, THREE.DoubleSide)));
   }
 }
 

@@ -291,7 +291,7 @@ C = dict(grass=0, garden=1, park=2, meadow=3, forest=4, scrub=5, pitch=6, track=
          rail=19, cemetery=20, wetland=21, rock=22, construction=23, footway=24, pool_edge=25, farmland=26,
          cobble=27, grave=28, manhole=29, court_blue=30, zone=31, zone2=32, piste=33, skijump=34,
          wheat=35, wheat2=36, rape=37, rape2=38, maize=39, maize2=40, soil=41, soil2=42,
-         plaza=43, plaza2=44, deck=45)    # pole: plodina + řádky
+         plaza=43, plaza2=44, deck=45, ballast=46)    # pole: plodina + řádky
 TW = int(2 * HALF / TEX_RES)
 TWE = TW + 2 * MPX                          # rastry včetně pásu sousedů
 cls = Image.new('L', (TWE, TWE), C['grass'])
@@ -328,7 +328,7 @@ LU = {'residential': 'garden', 'garden': 'garden', 'grass': 'park', 'park': 'par
       'cemetery': 'cemetery', 'pitch': 'pitch', 'track': 'track', 'playground': 'sand', 'stadium': 'pitch',
       'school': 'paved', 'kindergarten': 'garden', 'industrial': 'industrial', 'garages': 'industrial',
       'commercial': 'paved', 'retail': 'paved', 'pedestrian': 'cobble', 'plaza': 'cobble',
-      'construction': 'construction', 'railway': 'dirt', 'barracks': 'industrial', 'downhill': 'piste', 'ski_jump': 'skijump'}
+      'construction': 'construction', 'railway': 'ballast', 'barracks': 'industrial', 'downhill': 'piste', 'ski_jump': 'skijump'}
 NOTREE_LU = {'pitch', 'track', 'playground', 'stadium', 'school', 'industrial', 'garages', 'commercial',
              'retail', 'pedestrian', 'plaza', 'construction', 'railway', 'downhill', 'ski_jump'}
 lu = load('land_use')
@@ -928,9 +928,13 @@ for _, g, c, w, _n in roads:
                     d += 6
 for _, g, c, w, _n in roads:
     if c != 'rail' and w >= 3.5: line(g, C['curb'], w + 0.7, block=True)
+# zrušená trať (OSM railway=abandoned) má jen těleso bez kolejí; ostatní kolejnice kreslí 3D render (scene.koleje), čára v textuře zůstává pod ním
+_ABAND = shapely.STRtree([r.geom for _, r in seg.iterrows() if r.subtype == 'rail' and any('is_abandoned' in list(f.get('values')) for f in seg_flags(r))] or [Point(1e9, 1e9)])
 for _, g, c, w, _n in roads:
     if c == 'rail':
-        line(g, C['dirt'], 3.2, block=True); line(g, C['rail'], 1.4); continue
+        line(g, C['ballast'], 3.2, block=True)
+        if not len(_ABAND.query(g.interpolate(0.5, normalized=True), predicate='dwithin', distance=0.5)): line(g, C['rail'], 1.4)
+        continue
     line(g, C[RCLS.get(c, 'road')], w, block=w >= 3)
 # ruční povrchy (assets/upresneni.json, "plochy"): přes cesty, stromy pak určí assets/oblasti.json
 for pl in UP.get('plochy', []):
@@ -975,6 +979,183 @@ for l, w, c, n in drive_lines:
         rx, ry = ty, -tx                          # pravá strana
         cd.line(P([(q.x, q.y), (q.x + rx * (w / 2 - 0.3), q.y + ry * (w / 2 - 0.3))]), fill=C['marking'], width=max(1, round(0.45 / TEX_RES)))
 all_lines = [(l, w, c, n) for _, g, c, w, n in roads if c != 'rail' for l in lines(g)]
+
+# ---------------- koleje: štěrkové lože, pražce, kolejnice a výhybky (scene.koleje, kreslí render.html) ----------------
+# Textura terénu (~0,29 m/px) na kolejnice nestačí, trať je proto 3D pás: lože, pražce po 0,6 m a dvě kolejnice.
+# Výhybky se odvodí z topologie (data nemají body výhybek): uzel, kde se kolej větví pod ostrým úhlem. Kde jsou dvě
+# souběžné koleje blíž než SL_SEP (výhybka, kolejová spojka), mají společné dlouhé pražce: kreslí je delší kolej
+# a natáčí je vějířovitě k odbočce, kratší kolej tam vlastní pražce nemá. Pražce jsou vždy kolmo k ose (i v oblouku).
+# V přejezdu (silnice nebo chodník přes kolej v úrovni) lože a pražce chybí a kolejnice jsou zapuštěné do vozovky.
+GAUGE = 1.435
+RAIL_O = (GAUGE + 0.07) / 2           # osa kolejnice od osy koleje (rozchod se měří mezi vnitřními hranami hlav)
+PITCH, SL_HW, SL_SEP = 0.6, 1.3, 3.2  # rozteč pražců, půldélka pražce, do jaké vzdálenosti os mají dvě koleje společné pražce
+RAIL3D = {'standard_gauge', 'unknown'}   # tramvaj, metro a úzký rozchod zůstávají jen v textuře
+
+
+def _koleje():
+    keep = [r.geom for _, r in seg.iterrows() if r.subtype == 'rail' and r['class'] in RAIL3D
+            and not any('is_abandoned' in list(f.get('values')) for f in seg_flags(r))]      # zrušená trať (jen těleso) bez kolejí
+    if not keep: return None
+    kt = shapely.STRtree(keep)
+    WB = box(-HALF - 60, -HALF - 60, HALF + 60, HALF + 60)
+    pcs = []
+    for _a, g, c, _w, _n in roads:
+        if c != 'rail': continue
+        for l in lines(g.intersection(WB)):
+            if l.length >= 0.5 and len(kt.query(l.interpolate(0.5, normalized=True), predicate='dwithin', distance=0.5)): pcs.append(l)
+    if not pcs: return None
+    ch = [l for l in lines(shapely.ops.linemerge(shapely.MultiLineString(pcs))) if l.length >= 1.0]
+    LEN = [l.length for l in ch]
+    tree = shapely.STRtree(ch)
+
+    def pts(l, s): return shapely.get_coordinates(shapely.line_interpolate_point(l, np.clip(s, 0, l.length)))
+
+    def tang(l, s):
+        t = pts(l, np.asarray(s) + 0.8) - pts(l, np.asarray(s) - 0.8)
+        return t / np.maximum(np.hypot(*t.T), 1e-9)[:, None]
+    # přejezdy: úseky koleje pod silnicí nebo chodníkem v úrovni (ne podchod: cesta v tunelu se nepočítá)
+    tun = []
+    for _, r in load('segment').iterrows():
+        if r.subtype != 'road': continue
+        for f in seg_flags(r):
+            if 'is_tunnel' in list(f.get('values')):
+                t = f.get('between'); t0, t1 = (0.0, 1.0) if t is None else (float(t[0]), float(t[1]))
+                tun.append(shapely.ops.substring(r.geom, t0, t1, normalized=True))
+    tun_t = shapely.STRtree(tun) if tun else None
+    rl = [(l, w) for _a, g, c, w, _n in roads if c != 'rail' for l in lines(g)]
+    rt = shapely.STRtree([l for l, _w in rl]) if rl else None
+    XS = []
+    for A in ch:
+        iv = []
+        for j in (rt.query(A.buffer(6.0)) if rt is not None else []):
+            l, w = rl[int(j)]
+            if not A.intersects(l) or lines(A.intersection(l)): continue          # cesta musí kolej křížit (ne vést podél ní)
+            for q in lines(A.intersection(l.buffer(w / 2 + 0.05, cap_style='flat'))):
+                if q.length > 40 or not q.intersects(l): continue
+                m = q.interpolate(0.5, normalized=True)
+                if tun_t is not None and len(tun_t.query(m, predicate='dwithin', distance=1.5)): continue
+                sm = A.project(m); iv.append((sm - q.length / 2, sm + q.length / 2))   # přes střed (kolej se může vracet blízko sebe)
+        iv.sort(); mg = []
+        for a, b in iv:
+            if mg and a <= mg[-1][1] + 0.5: mg[-1][1] = max(mg[-1][1], b)
+            else: mg.append([a, b])
+        XS.append(mg)
+
+    def in_x(i, s):
+        s = np.asarray(s); m = np.zeros(s.shape, bool)
+        for a, b in XS[i]: m |= (s >= a - 0.1) & (s <= b + 0.1)
+        return m
+    # pražce: hranice mezi pražci (sudé indexy) a středy pražců (liché), pak úseky bez potlačených pražců
+    strips, COS = [], math.cos(math.radians(25))
+    for i, A in enumerate(ch):
+        n_sl = int(A.length // PITCH)
+        if n_sl < 1: continue
+        S = (A.length - n_sl * PITCH) / 2 + np.arange(2 * n_sl + 1) * PITCH / 2
+        Pp = pts(A, S); T = tang(A, S); Nn = np.stack([-T[:, 1], T[:, 0]], 1)
+        ext = np.full((len(S), 2), SL_HW); rot = np.zeros(len(S)); sup = in_x(i, S)
+        for j in tree.query(A.buffer(SL_SEP + 0.5)):
+            j = int(j)
+            if j == i: continue
+            Bj = ch[j]
+            sB = shapely.line_locate_point(Bj, shapely.points(Pp))
+            D = pts(Bj, sB) - Pp; d = np.hypot(*D.T); TB = tang(Bj, sB); cs = np.sum(T * TB, 1)
+            m = (sB > 0.3) & (sB < Bj.length - 0.3) & (d < SL_SEP) & (np.abs(cs) > COS)
+            if not m.any(): continue
+            if (LEN[j], j) > (LEN[i], i): sup |= m; continue          # pražce tu kreslí delší kolej
+            TB = TB * np.sign(cs)[:, None]
+            ang = np.arctan2(T[:, 0] * TB[:, 1] - T[:, 1] * TB[:, 0], np.sum(T * TB, 1))
+            lat = np.sum(D * Nn, 1); e = np.abs(lat) + SL_HW
+            for k, sel in ((0, m & (lat > 0)), (1, m & (lat <= 0))):
+                sel = sel & (e > ext[:, k])
+                ext[sel, k] = e[sel]; rot[sel] = ang[sel] / 2 * np.clip(d[sel] / SL_SEP, 0, 1)   # vějíř: natočení roste s rozjezdem
+        cr, sr = np.cos(rot), np.sin(rot)
+        M = np.stack([Nn[:, 0] * cr - Nn[:, 1] * sr, Nn[:, 0] * sr + Nn[:, 1] * cr], 1)
+        L = Pp + M * ext[:, :1]; R = Pp - M * ext[:, 1:]
+        ok = ~sup[1::2]                                               # pražec k (střed 2k+1) se kreslí?
+        k = 0
+        while k < n_sl:
+            if not ok[k]: k += 1; continue
+            k1 = k
+            while k1 + 1 < n_sl and ok[k1 + 1]: k1 += 1
+            bi = np.arange(k, k1 + 2) * 2                             # hranice pražců k..k1+1
+            Lb, Rb = L[bi], R[bi]
+            kp, a = [0], 0
+            while a < len(bi) - 1:                                    # vynechat hranice, které leží na spojnici sousedních
+                b_ = min(a + 4, len(bi) - 1)
+                while b_ > a + 1:
+                    t = ((np.arange(a + 1, b_) - a) / (b_ - a))[:, None]
+                    err = max(np.abs(Lb[a] + (Lb[b_] - Lb[a]) * t - Lb[a + 1:b_]).max(), np.abs(Rb[a] + (Rb[b_] - Rb[a]) * t - Rb[a + 1:b_]).max())
+                    if err < 0.03: break
+                    b_ -= 1
+                kp.append(b_); a = b_
+            strips.append([v for q in kp for v in (round(float(Lb[q][0]), 2), round(float(Lb[q][1]), 2),
+                                                   round(float(Rb[q][0]), 2), round(float(Rb[q][1]), 2), q)])
+            k = k1 + 1
+    # kolejnice: osy +- RAIL_O, třetí číslo bodu 1 = na pražcích, 0 = zapuštěná v přejezdu; typ 0 kolejnice, 1 přídržnice, 2 srdcovka
+    rails = []
+
+    def offs(i, s0, s1, o, typ, step=2.0):
+        A = ch[i]; s0, s1 = max(0.0, s0), min(A.length, s1)
+        if s1 - s0 < 0.2: return
+        S = np.arange(s0, s1, step)
+        S = np.unique(np.concatenate([S, [s1], [v for a, b in XS[i] for v in (a - 0.6, a, b, b + 0.6) if s0 < v < s1]]))
+        Q = pts(A, S); T = tang(A, S); Q = Q + np.stack([-T[:, 1], T[:, 0]], 1) * o
+        f = (~in_x(i, S)).astype(int)
+        rails.append([typ] + [v for q, f_ in zip(Q, f) for v in (round(float(q[0]), 2), round(float(q[1]), 2), int(f_))])
+    for i, A in enumerate(ch):
+        for o in (RAIL_O, -RAIL_O): offs(i, 0, A.length, o, 0)
+    # výhybky: uzel, ze kterého vedou tři větve a dvě z nich svírají ostrý úhel. Overture nedělí kusy v každém uzlu:
+    # odbočka často končí uprostřed průběžné koleje (ta pak dává dvě větve). Větev = (kolej, staničení uzlu, směr od uzlu).
+    ends = {}
+    for i, A in enumerate(ch):
+        for s0, sg, q in ((0.0, 1.0, A.coords[0]), (LEN[i], -1.0, A.coords[-1])): ends.setdefault((round(q[0], 1), round(q[1], 1)), []).append((i, s0, sg))
+    for key in list(ends):
+        if len(ends[key]) != 1: continue
+        q = Point(key)
+        for j in tree.query(q.buffer(0.2)):
+            j = int(j); sj = ch[j].project(q)
+            if j != ends[key][0][0] and ch[j].distance(q) < 0.1 and 0.5 < sj < LEN[j] - 0.5:
+                ends[key] += [(j, sj, 1.0), (j, sj, -1.0)]; break
+    pm, nsw = [], 0
+    for key, E in ends.items():
+        if len(E) != 3: continue
+        node = np.array(key)
+        dirs = []
+        for i, s0, sg in E:
+            q = pts(ch[i], [s0 + sg * min(6.0, LEN[i] / 2)])[0] - node
+            dirs.append(q / (np.hypot(*q) or 1))
+        best = None
+        for a in range(3):
+            for b in range(a + 1, 3):
+                c_ = 3 - a - b; ca = float(np.dot(dirs[a], dirs[b]))
+                if ca > math.cos(math.radians(30)) and float(np.dot(dirs[c_], dirs[a] + dirs[b])) < -1.4 and (best is None or ca > best[0]): best = (ca, a, b, c_)
+        if best is None: continue
+        _ca, a, b, c_ = best
+        thr, dv = (a, b) if np.dot(dirs[a], -dirs[c_]) >= np.dot(dirs[b], -dirs[c_]) else (b, a)
+        (it, s0t, sgt), (iv_, s0v, sgv) = E[thr], E[dv]
+        if it == iv_: continue
+        nsw += 1
+        # srdcovka: vnitřní kolejnice obou větví se kříží tam, kde jsou osy od sebe 2 * RAIL_O
+        dd = np.arange(0.5, min(LEN[iv_] - s0v if sgv > 0 else s0v, 80.0), 0.25)
+        if len(dd) < 2: continue
+        Q = pts(ch[iv_], s0v + sgv * dd); dist = shapely.distance(ch[it], shapely.points(Q))
+        hit = np.where(dist >= 2 * RAIL_O)[0]
+        if not len(hit) or dist[-1] < 2 * RAIL_O: continue
+        k = int(hit[0]); sf = s0v + sgv * dd[k]                          # staničení srdcovky na odbočce
+        sat = ch[it].project(Point(*Q[k])); Qt = pts(ch[it], [sat])[0]
+        tv_ = tang(ch[iv_], [sf])[0]; tt_ = tang(ch[it], [sat])[0]
+        sdv = 1.0 if np.dot(Qt - Q[k], [-tv_[1], tv_[0]]) > 0 else -1.0   # na které straně odbočky leží přímá větev
+        sdt = 1.0 if np.dot(Q[k] - Qt, [-tt_[1], tt_[0]]) > 0 else -1.0   # na které straně přímé větve leží odbočka
+        offs(iv_, min(sf - 0.6 * sgv, sf + 2.2 * sgv), max(sf - 0.6 * sgv, sf + 2.2 * sgv), sdv * RAIL_O, 2, 0.4)   # srdcovka
+        offs(it, sat - 2.2, sat + 2.2, -sdt * (RAIL_O - 0.26), 1, 0.5)    # přídržnice proti srdcovce na vnějších kolejnicích
+        offs(iv_, sf - 2.2, sf + 2.2, -sdv * (RAIL_O - 0.26), 1, 0.5)
+        s1 = s0t + sgt * 1.5; q0 = pts(ch[it], [s1])[0]; t0 = tang(ch[it], [s1])[0]
+        n0 = np.array([-t0[1], t0[0]]) * -sdt * (SL_HW + 0.45)            # přestavník u hrotu jazyků, z vnější strany
+        pm.append([round(float(q0[0] + n0[0]), 2), round(float(q0[1] + n0[1]), 2), round(math.atan2(t0[1], t0[0]), 3)])
+    ax = [[round(v, 2) for q in A.coords for v in q[:2]] for A in ch]
+    print('koleje', len(ch), 'kusů', round(sum(LEN) / 1000, 1), 'km, výhybek', nsw, 'pásů pražců', len(strips), 'přejezdů', sum(len(x) for x in XS))
+    return {'o': ax, 'x': [[round(v, 2) for q in x for v in q] for x in XS], 's': strips, 'r': rails, 'pm': pm}
+KOLEJE = _koleje()
 
 def deck_runs(pts):
     """mostovka jen nad terénem mapy: nájezd, který pokračuje cestou za okraj mapy, by visel do prázdna (hráz u okraje) -> souvislé kusy uvnitř EXT"""
@@ -2085,7 +2266,7 @@ SEASON_PAL = {
                'piste': (150, 178, 92), 'skijump': (98, 160, 150),
                'wheat': (214, 186, 106), 'wheat2': (194, 162, 86), 'rape': (150, 148, 82), 'rape2': (128, 126, 70),
                'maize': (80, 134, 58), 'maize2': (58, 106, 44), 'soil': (110, 142, 66), 'soil2': (128, 104, 70),
-               'plaza': (186, 186, 184), 'plaza2': (206, 206, 200), 'deck': (146, 104, 88)},
+               'plaza': (186, 186, 184), 'plaza2': (206, 206, 200), 'deck': (146, 104, 88), 'ballast': (150, 138, 116)},
 }
 sp = dict(SEASON_PAL['summer'])
 sp.update({'grass': (122, 176, 80), 'garden': (132, 184, 86), 'park': (118, 180, 78), 'meadow': (150, 188, 90),
@@ -2108,7 +2289,7 @@ wi.update({'forest': (214, 222, 232), 'scrub': (220, 226, 234), 'paved': (222, 2
            'parking': (176, 180, 188), 'road': (104, 106, 114), 'marking': (190, 192, 196), 'curb': (226, 230, 236),
            'dirt': (214, 214, 218), 'water': (186, 210, 228), 'pool': (150, 168, 184), 'stream': (58, 96, 136),
            'footway': (226, 230, 236), 'cobble': (206, 210, 218), 'pool_edge': (230, 234, 238), 'grave': (222, 226, 232), 'manhole': (90, 92, 98)})
-wi.update({'plaza': (208, 212, 220), 'plaza2': (222, 226, 232), 'deck': (176, 160, 160)})
+wi.update({'plaza': (208, 212, 220), 'plaza2': (222, 226, 232), 'deck': (176, 160, 160), 'ballast': (212, 214, 220)})
 SEASON_PAL['winter'] = wi
 
 # kontrolní ohraničení zón upřesněných podle snímků (geo.SAT_OUTLINE, po kontrole vypnout)
@@ -2189,7 +2370,7 @@ json.dump({'chunk': CHUNK, 'center': [CX, CY], 'half': HALF, 'step': STEP, 'n': 
            'ms': MS, 'hext': [round(float(v), 2) for v in HX.ravel()], 'nb': NB, 'margin': geo.MARGIN, 'skirt': geo.skirt_edges(CHUNK),
            'floor': geo.FLOOR, 'top': round(TOP, 1),
            'buildings': buildings, 'trees': trees, 'props': props, 'cars': cars, 'buses': buses, 'portals': portals, 'lines': lines_out,
-           'herds': herds_out,
+           'herds': herds_out, 'koleje': KOLEJE,
            'bridges': [{'p': run, 'w': D[4], 'k': D[5], 'c': D[6], 'wtr': D[8] if len(D) > 8 else 0} for D in DECKS if D[0].intersects(EXT)
                        for run in deck_runs([[*q, round(float(g_), 2)] for q, g_ in zip(deck_line(D), D[3])])]},
           open(f'{OUT}/scene.json', 'w'), separators=(',', ':'))

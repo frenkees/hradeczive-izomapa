@@ -303,7 +303,7 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
             S[rb:rb + GX.shape[0]][hit] = C['marking']
         # 5a) zóny přestaveb: povrchy podle OSM (pasport je tu ze stavu před přestavbou)
         if _ZON is not None and _ZON.any():
-            _ROADISH = np.isin(S, ROADISH + [C['construction'], C['dirt']])
+            _ROADISH = np.isin(S, ROADISH + [C['construction'], C['dirt'], C.get('ballast', C['dirt'])])
             S[_ZON & _ROADISH] = C['grass']                      # cesty z Overture (odhad šířky) a staré plochy pryč
 
             def _plines(geoms, k, wpx=1):                       # tenké čáry (značení) přímo do rastru
@@ -581,3 +581,270 @@ if HOOK == 'props':
             cars[:] = [c_ for c_ in cars if math.hypot(c_[0] - _x, c_[1] - _y) > 2.0]          # auto z odhadu na stejném stání pryč
             props['egg'].append([round(_x, 2), round(_y, 2), round(float(ground(_x, _y)), 2), round(_an, 3), _ty])
     if props['egg']: print('vajíčko: aut', len(props['egg']))
+
+# ---- vizuální identita řetězců: obchody, rychlé občerstvení, čerpací stanice (assets/znacky.json -> model 'znacka' v custom_models.js) ----
+# Místa: Overture places (data/places.parquet, název + kategorie) a názvy budov v datech. Bod místa uvnitř půdorysu (jinak nejbližší
+# budova do 20 m) určí budovu. Jediná značka v budově = celá budova v barvách (zdi, pás pod střechou, cedule, vstup, pylon u vjezdu);
+# víc značek v jedné budově (retail park) = každá jen pás a cedule na nejbližší stěně; vysoký dům = výloha v parteru.
+# Nákupní centra (místo shopping_mall v budově) a dominanty se nemění – mají vlastní záznam v dominanty.json.
+# Čerpací stanice: stříška (budova třídy roof do 35 m) dostane barevné čelo a stojany, prodejna pás, u silnice pylon s cenami.
+# Vypnout: IZO_ZNACKY=0
+if HOOK == 'props' and os.environ.get('IZO_ZNACKY', '1') != '0' and os.path.exists('assets/znacky.json'):
+    import re as _re
+    _ZT = json.load(open('assets/znacky.json', encoding='utf-8'))
+    _ZN = {z['id']: z for z in _ZT['znacky']}
+    _ZRE = [(z, _re.compile(z['re']), _re.compile(z['brand']) if z.get('brand') else None) for z in _ZT['znacky'] if z['re'] != '^$']
+    _ZVYN = set(_ZT['vynech'])
+    _ZGAS = ('gas_station', 'fueling_station', 'truck_gas_station')
+
+    def _zn_brand(name, bname, cat):
+        n = (name or '').lower().strip(); bn = (bname or '').lower().strip()
+        for z, rx, rb in _ZRE:
+            if z.get('kat') and cat not in z['kat']: continue
+            if (z['druh'] == 'pumpa') != (cat in _ZGAS): continue
+            if rx.search(n) or (rb is not None and rb.search(bn)): return z
+        return None
+
+    _zhits, _zmall, _zgas = [], [], []                     # (značka, x, y), body nákupních center, (značka|None, x, y)
+    if os.path.exists('data/places.parquet'):
+        _pl = pq.read_table('data/places.parquet', columns=['geometry', 'confidence', 'names', 'brand', 'basic_category', 'operating_status']).to_pandas()
+        for _g, _cf, _nm, _br, _ct, _os in zip(_pl.geometry, _pl.confidence, _pl.names, _pl.brand, _pl.basic_category, _pl.operating_status):
+            if _cf < 0.6 or (isinstance(_os, str) and _os != 'open'): continue
+            _ct = _ct if isinstance(_ct, str) else ''
+            if _ct in _ZVYN: continue
+            _p = shapely.from_wkb(_g); _x, _y = (float(v) for v in to_local(_p.x, _p.y))
+            if not EXT.buffer(150).contains(Point(_x, _y)): continue
+            _n = (_nm or {}).get('primary') or ''
+            _bn = ((_br or {}).get('names') or {}).get('primary') if isinstance(_br, dict) else None
+            if _ct == 'shopping_mall' and _cf >= 0.7: _zmall.append((_x, _y)); continue
+            _z = _zn_brand(_n, _bn, _ct)
+            if _ct in _ZGAS: _zgas.append((_z, _x, _y)); continue
+            if _z: _zhits.append((_z, _x, _y, 0))
+    for _nm, _gm in zip(bld.names, bld.geom):            # názvy budov v datech (OSM name=Lidl, Kaufland…)
+        _n = (_nm or {}).get('primary') if isinstance(_nm, dict) else None
+        if not _n: continue
+        _z = _zn_brand(_n, None, 'building')
+        if _z:
+            _rp = _gm.representative_point(); _zhits.append((_z, _rp.x, _rp.y, 1))
+
+    _zb = [(k, Polygon(b['p'])) for k, b in enumerate(buildings) if len(b['p']) >= 3 and not b.get('only')]
+    _zb = [(k, q if q.is_valid else q.buffer(0)) for k, q in _zb]
+    _ztree = shapely.STRtree([q for _, q in _zb])
+
+    def _zn_bld(x, y, r=20.0, roof=None):
+        """budova obsahující bod, jinak nejbližší do r m (roof: True = jen stříšky, False = bez stříšek)"""
+        P_ = Point(x, y); best = None
+        for i in _ztree.query(P_.buffer(r)):
+            k, q = _zb[i]; b = buildings[k]
+            if roof is not None and (b['s'] == 12) != roof: continue
+            if q.area < 15: continue
+            d = 0.0 if q.contains(P_) else q.distance(P_)
+            if d <= r and (best is None or d < best[0] or (d == best[0] == 0.0 and q.area < _zb[best[1]][1].area)): best = (d, i)
+        return None if best is None else _zb[best[1]][0]
+
+    _ZRD = [(l_, w_, c_) for w_, l_, c_, _w2, _n in roads if c_ in DRIVE and l_.length > 5]
+    _zrtree = shapely.STRtree([l_ for l_, _, _ in _ZRD]) if _ZRD else None
+    _ZBAD = {C['road'], C['marking'], C['water'], C['rail'], C['pool'], C['stream']}
+
+    def _zn_free(x, y):
+        """místo pro pylon: ne na silnici, vodě, koleji ani v budově"""
+        i_, j_ = pix(x, y)
+        if not (0 <= i_ < TWE and 0 <= j_ < TWE): return False
+        if cls.getpixel((i_, j_)) in _ZBAD: return False
+        return not any(_zb[i][1].distance(Point(x, y)) < 1.2 for i in _ztree.query(Point(x, y).buffer(1.5)))
+
+    def _zn_pylon(q):
+        """pylon u vjezdu: nejbližší silnice k budově (raději ne obslužná), od její osy kousek k budově"""
+        if _zrtree is None: return None
+        cand = []
+        for i in _zrtree.query(q.buffer(150)):
+            l_, w_, c_ = _ZRD[i]; d = l_.distance(q)
+            cand.append((d + (25 if c_ == 'service' else 0), l_, w_))
+        for _, l_, w_ in sorted(cand, key=lambda t: t[0])[:6]:
+            pr = shapely.ops.nearest_points(l_, q)[0]
+            for sh in (0.0, 6.0, -6.0, 12.0, -12.0, 20.0, -20.0):
+                s_ = l_.project(pr) + sh
+                if s_ < 0 or s_ > l_.length: continue
+                R_ = l_.interpolate(s_); Q_ = shapely.ops.nearest_points(R_, q)[1]
+                dx, dy = Q_.x - R_.x, Q_.y - R_.y; dl = math.hypot(dx, dy)
+                if dl < 1e-3: continue
+                for off in (w_ / 2 + 2.5, w_ / 2 + 4.0, w_ / 2 + 6.0):
+                    if off > dl - 1.5: break
+                    x_, y_ = R_.x + dx / dl * off, R_.y + dy / dl * off
+                    if _zn_free(x_, y_):
+                        t0, t1 = l_.interpolate(max(0.0, s_ - 2)), l_.interpolate(min(l_.length, s_ + 2))
+                        return [round(x_, 2), round(y_, 2), round(float(ground(x_, y_)), 2), round(math.atan2(t1.y - t0.y, t1.x - t0.x), 4)]
+        return None
+
+    _ZOK = {C['parking']: 2.0, C['paved']: 1.0, C['road']: 1.0, C['industrial']: 0.6, C['footway']: 0.8, C['cobble']: 0.8}
+
+    def _zn_front(ring):
+        """průčelí: stěna, před kterou je parkoviště / zpevněná plocha, s mírnou předností stěn viditelných z jihozápadu"""
+        best = (-1e9, 0)
+        for i in range(len(ring)):
+            (x0, y0), (x1, y1) = ring[i], ring[(i + 1) % len(ring)]
+            L = math.hypot(x1 - x0, y1 - y0)
+            if L < 5: continue
+            nx, ny = (y1 - y0) / L, -(x1 - x0) / L; mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+            sc = 0.0
+            for d in (5, 10, 16, 24):
+                for f in (-0.3, 0.0, 0.3):
+                    x_, y_ = mx + nx * d + (x1 - x0) * f, my + ny * d + (y1 - y0) * f
+                    i_, j_ = pix(x_, y_)
+                    if 0 <= i_ < TWE and 0 <= j_ < TWE: sc += _ZOK.get(cls.getpixel((i_, j_)), 0.0)
+            sc += 3.0 * max(0.0, -(nx + ny) / math.sqrt(2)) + 0.05 * min(L, 60)
+            if sc > best[0]: best = (sc, i)
+        return best[1]
+
+    def _zn_edge(ring, x, y):
+        """nejbližší stěna k bodu a poloha podél ní"""
+        P_ = Point(x, y); best = None
+        for i in range(len(ring)):
+            l_ = LineString([ring[i], ring[(i + 1) % len(ring)]])
+            if l_.length < 3: continue
+            d = l_.distance(P_)
+            if best is None or d < best[0]: best = (d, i, l_.project(P_), l_.length)
+        return best
+
+    def _zn_cols(z):
+        r = {'k': z['id'], 'pas': z['pas'], 'p2': z.get('p2'), 'ph': z.get('ph', 2.0), 'lg': z['logo']}
+        if z.get('txt'): r['txt'] = z['txt']; r['tc'] = z.get('tc', [255, 255, 255])
+        return r
+
+    def _zn_drop_cars(x, y, r=2.5):
+        cars[:] = [c_ for c_ in cars if math.hypot(c_[0] - x, c_[1] - y) > r]
+
+    def _zn_whole(b, z, por):
+        """celá budova v barvách značky: zdi, plochá střecha, pás, cedule na průčelí, vstup, pylon"""
+        q = Polygon(b['p'])
+        fe = _zn_front(b['p'])
+        (x0, y0), (x1, y1) = b['p'][fe], b['p'][(fe + 1) % len(b['p'])]
+        zn = {**_zn_cols(z), 'm': 'cela', 'f': [fe, round(math.hypot(x1 - x0, y1 - y0) / 2, 2)], 'por': por}
+        L0 = math.hypot(x1 - x0, y1 - y0)
+        if L0 > 0 and -((y1 - y0) - (x1 - x0)) / L0 / math.sqrt(2) < 0.25:  # průčelí není z jihozápadu vidět: nápis i na nejdelší viditelné stěně
+            best = None
+            for i in range(len(b['p'])):
+                (a0, c0), (a1, c1) = b['p'][i], b['p'][(i + 1) % len(b['p'])]; L_ = math.hypot(a1 - a0, c1 - c0)
+                if L_ > 6 and -((c1 - c0) - (a1 - a0)) / L_ / math.sqrt(2) > 0.3 and (best is None or L_ > best[1]): best = (i, L_)
+            if best: zn['f2'] = [best[0], round(best[1] / 2, 2)]
+        if z.get('wc'): b['wc'] = tuple(z['wc'])
+        if z.get('rc'): b['rc'] = tuple(z['rc'])
+        if z.get('win'): b['s'] = z['win']
+        if b['r'] != 'flat' and q.area > 60: b['r'] = 'flat'; b['parts'] = []; b['rh'] = 0.0
+        b.pop('ch', None); b.pop('dm', None)
+        return zn
+
+    # --- obchody a rychlé občerstvení ---
+    _zby = {}
+    for z, x, y, own in _zhits:
+        k = _zn_bld(x, y, 2.0 if own else 20.0, roof=False)
+        if k is not None: _zby.setdefault(k, []).append((z, x, y, own))
+    _zmallb = {k for x, y in _zmall if (k := _zn_bld(x, y, 3.0, roof=False)) is not None}
+    _zn_n = {}
+    for k, hits in _zby.items():
+        b = buildings[k]
+        if k in _zmallb or b.get('dn') or b.get('lm'): continue                # nákupní centrum, dominanta, kostel…
+        q = Polygon(b['p']); hgt = b['e'] - b['g']
+        if any(h[3] for h in hits): hits = [h for h in hits if h[3]]         # název budovy v datech má přednost před body míst
+        ids = []
+        for z, x, y, _o in hits:
+            if z['id'] not in [i_ for i_, *_ in ids]: ids.append((z['id'], x, y))
+        tall = hgt > 10.5 or b['s'] in (1, 11)
+        mk = [i_ for i_ in ids if _ZN[i_[0]]['druh'] in ('market', 'fast')]
+        if len(ids) > 1 and len(mk) == 1 and q.area >= 3000 and not tall:      # hypermarket s pasáží: kotva celá, nájemci výlohou v parteru
+            ids = [mk[0]] + [i_ for i_ in ids if i_ is not mk[0]]; tenants = ids[1:]; ids_all = ids; ids = [mk[0]]
+        else: tenants = []; ids_all = ids
+        z0 = _ZN[ids[0][0]]
+        if len(ids) == 1 and not tall and q.area < 20000 and not (z0['druh'] == 'shop' and q.area > 2500):
+            zn = _zn_whole(b, z0, z0.get('portal'))
+            if z0.get('pylon'):
+                pl = _zn_pylon(q)
+                if pl: zn['pl'] = pl + [z0['pylon']]; _zn_drop_cars(pl[0], pl[1])
+            if z0['druh'] == 'fast': b['rt'] = []
+            segs = []
+            for zid, x, y in tenants:
+                e = _zn_edge(b['p'], x, y)
+                if e is None: continue
+                _, i, s_, L = e; half = min(6.0, L / 2); s_ = min(max(s_, half), L - half)
+                segs.append({**_zn_cols(_ZN[zid]), 'e': [i, round(s_ - half, 2), round(s_ + half, 2)], 'z': 3.0})
+            if segs: zn['seg'] = segs
+        else:                                                                   # více nájemců / parter vysokého domu: pás a cedule u bodu
+            segs = []
+            for zid, x, y in ids:
+                e = _zn_edge(b['p'], x, y)
+                if e is None: continue
+                _, i, s, L = e; half = min(9.0, L / 2)
+                s = min(max(s, half), L - half)
+                segs.append({**_zn_cols(_ZN[zid]), 'e': [i, round(s - half, 2), round(s + half, 2)], 'z': 3.2 if tall else None})
+            if not segs: continue
+            zn = {'m': 'cast', 'seg': segs}
+        b['lm'] = 'znacka'; b['zn'] = zn
+        for i_, *_ in ids_all: _zn_n[i_] = _zn_n.get(i_, 0) + 1
+
+    # --- čerpací stanice ---
+    _zdone = set()
+    for z, x, y in sorted(_zgas, key=lambda t: t[0] is None):                 # se značkou napřed (duplicitní místa téže pumpy)
+        bez = z is None; z = z or _ZN['pumpa']
+        kc = None                                                              # stříška: největší do 35 m od bodu
+        for i in _ztree.query(Point(x, y).buffer(35)):
+            k, q = _zb[i]
+            if buildings[k]['s'] == 12 and q.area > 40 and q.distance(Point(x, y)) < 35 and (kc is None or q.area > Polygon(buildings[kc]['p']).area): kc = k
+        if kc is not None and kc in _zdone: continue
+        ref = Polygon(buildings[kc]['p']) if kc is not None else Point(x, y)
+        ks = None; dks = 1e9
+        for i in _ztree.query(ref.buffer(30)):
+            k, q = _zb[i]; b = buildings[k]
+            if b['s'] == 12 or q.area > 700 or q.area < 15 or b.get('lm') or b.get('dn') or k in _zdone: continue
+            if q.distance(ref) < dks: ks, dks = k, q.distance(ref)
+        if kc is None and (ks is None or bez): continue                       # pumpa bez značky a bez stříšky: nejspíš firemní, nic
+        if kc is not None:
+            b = buildings[kc]; _zdone.add(kc)
+            b['rc'] = (236, 236, 234); b['lm'] = 'znacka'
+            b['zn'] = {**_zn_cols(z), 'm': 'stris'}
+            pl = _zn_pylon(Polygon(b['p']))
+            if pl: b['zn']['pl'] = pl + [z.get('pylon', 6)]; _zn_drop_cars(pl[0], pl[1])
+        if ks is not None:
+            b = buildings[ks]; _zdone.add(ks); b['lm'] = 'znacka'
+            b['zn'] = {**_zn_whole(b, z, None), 'pumpa': 1}
+            b['s'] = 3
+            if kc is None:
+                pl = _zn_pylon(Polygon(b['p']))
+                if pl: b['zn']['pl'] = pl + [z.get('pylon', 6)]; _zn_drop_cars(pl[0], pl[1])
+        _zn_n[z['id']] = _zn_n.get(z['id'], 0) + 1
+    print('značky:', ', '.join(f'{k} {v}' for k, v in sorted(_zn_n.items())) or 'žádné')
+
+# ---- nákupní centra a další dominanty s doplňky z dominanty.json ("spec": {"lm": "oc", "oc": {...}}) ----
+# Části (hranoly, ovály), obklady fasád, cedule s nápisy a světlíky jsou v lat/lon; tady se převedou do souřadnic čtverce
+# a připojí jen k jednomu dílu budovy (ten, který obsahuje bod dominanty, jinak největší), aby se nekreslily vícekrát.
+if HOOK == 'props':
+    def _oc_ll(v):
+        if isinstance(v, list) and len(v) == 2 and all(isinstance(t, (int, float)) for t in v) and 40 < v[0] < 60:
+            x_, y_ = to_local(v[1], v[0]); return [round(float(x_), 2), round(float(y_), 2)]
+        return v
+
+    def _oc_conv(o):
+        if isinstance(o, dict):
+            r = {}
+            for k, v in o.items():
+                if k in ('c', 'p'): r[k] = _oc_ll(v)
+                elif k == 'q': r[k] = [_oc_ll(p) for p in v]
+                elif k == 'svetliky': r[k] = [[*_oc_ll(s[:2]), *s[2:]] for s in v]
+                else: r[k] = _oc_conv(v)
+            return r
+        if isinstance(o, list): return [_oc_conv(v) for v in o]
+        return o
+
+    for d in DOMS:
+        if 'oc' not in d['spec']: continue
+        pcs = [b for b in buildings if b.get('dn') == d['name'] and len(b['p']) >= 3]
+        if not pcs: continue
+        P_ = Point(*d['xy'])
+        inn = [b for b in pcs if Polygon(b['p']).buffer(1.0).contains(P_)]
+        tgt = inn[0] if inn else max(pcs, key=lambda b: Polygon(b['p']).area)
+        tgt['oc'] = _oc_conv(d['spec']['oc'])
+        for c_ in tgt['oc'].get('casti', []):                  # "nahradit": budovy z dat uvnitř části srovnat k zemi (vlastní tvar je nahradí)
+            if not c_.get('nahradit') or 'q' not in c_: continue
+            zp = Polygon(c_['q']).buffer(2.0)
+            for b in buildings:
+                if b is tgt or b.get('dn') == d['name'] or len(b['p']) < 3: continue
+                if zp.contains(Polygon(b['p']).centroid): b['e'] = round(b['g'] + 0.3, 2); b['r'] = 'flat'; b['parts'] = []; b['rh'] = 0.0; b.pop('rt', None); b.pop('ch', None)

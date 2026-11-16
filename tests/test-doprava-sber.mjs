@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { pridej, typicka, slot } from '../../skripty/doprava_sber.mjs';
+import { pridej, typicka, slot, kvota } from '../../skripty/doprava_sber.mjs';
 
 const agg = { n: 0, s: {} };
 const kdy = new Date('2026-11-16T07:10:00Z');                       // pondělí 8:10 v Praze
@@ -15,4 +15,8 @@ assert.equal(t.n, 2);
 assert.equal(t.s.k1[8], 40);                                          // medián z (40, 60) = spodní prostřední
 assert.equal(t.s.k1[9], null);                                        // jiná hodina: bez dat
 assert.equal(t.s.k2, undefined);                                      // jediný snímek nestačí
+const q = { n: 0, s: {} }, d1 = new Date('2026-11-16T07:10:00Z');
+assert.equal(kvota(q, d1, 2), true); assert.equal(kvota(q, d1, 2), true); assert.equal(kvota(q, d1, 2), false);   // po limitu už ne
+assert.equal(kvota(q, new Date('2026-12-01T00:10:00Z'), 2), true);                                               // nový měsíc = počítadlo od nuly
+assert.equal(q.kvota.n, 1);
 console.log('doprava-sber OK');

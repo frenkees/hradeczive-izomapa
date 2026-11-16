@@ -25,6 +25,10 @@ class Obsluha(http.server.SimpleHTTPRequestHandler):
             try: telo = provoz(); kod = 200
             except Exception as e: telo = b'{"s":{}}'; kod = 502; print('HERE:', e)
             self.send_response(kod); self.send_header('content-type', 'application/json'); self.send_header('content-length', str(len(telo))); self.end_headers(); self.wfile.write(telo); return
+        if self.path.split('?')[0] == '/api/doprava_typicka':   # místní zkouška: build/here/data/typicka.json ze sběrače (skripty/doprava_sber.mjs)
+            f = os.path.join(H.ROOT, 'build', 'here', 'data', 'typicka.json')
+            telo = open(f, 'rb').read() if os.path.exists(f) else b'{"n":0,"s":{}}'
+            self.send_response(200); self.send_header('content-type', 'application/json'); self.send_header('content-length', str(len(telo))); self.end_headers(); self.wfile.write(telo); return
         super().do_GET()
 
 

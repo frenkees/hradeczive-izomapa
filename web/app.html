@@ -1492,13 +1492,18 @@ dialog.help ol.vd-list { margin: 0; padding-left: 22px; } ol.vd-list li { margin
   if (HERE.on) {
     const jamRow = $('l-jam-row'); jamRow.hidden = false;
     $('jam-mode').onchange = (e) => { HERE.mode = e.target.value; };
-    const nactiTyp = () => fetch('doprava_typicka.json' + VER).then((r) => r.ok ? r.json() : null).then((d) => {
-      if (d && d.s) { HERE.typ = d.s; HERE.v++; }
-      for (const o of $('jam-mode').options) if (o.value !== 'live') o.disabled = !(d && d.s && Object.keys(d.s).length);   // typické hodiny až po nasbírání snímků
-    }).catch(() => {});
+    const nactiIds = async () => HERE.ids || (HERE.ids = await fetch('doprava_id.json' + VER).then((r) => r.json()));
+    const nactiTyp = async () => {                         // typický průběh podle hodiny: api/doprava_typicka (sběr snímků na serveru, klíč úseku -> 48 hodnot)
+      let ok = false;
+      try {
+        const [ids, d] = await Promise.all([nactiIds(), fetch('api/doprava_typicka').then((r) => r.ok ? r.json() : null)]);
+        if (d && d.s) { const t = {}; for (const [k, v] of Object.entries(d.s)) if (ids[k] !== undefined) t[ids[k]] = v; HERE.typ = t; HERE.v++; ok = Object.keys(t).length > 0; }
+      } catch (e) { /* bez historie zůstává jen živý stav */ }
+      for (const o of $('jam-mode').options) if (o.value !== 'live') o.disabled = !ok;   // typické hodiny až po nasbírání snímků
+    };
     const nactiZive = async () => {
       try {
-        if (!HERE.ids) HERE.ids = await fetch('doprava_id.json' + VER).then((r) => r.json());
+        await nactiIds();
         const r = await fetch('api/doprava'); if (!r.ok) throw new Error(r.status);
         const d = await r.json(), m = new Map();
         for (const [k, v] of Object.entries(d.s || {})) if (HERE.ids[k] !== undefined) m.set(HERE.ids[k], v);

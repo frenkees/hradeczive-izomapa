@@ -51,7 +51,18 @@ if HOOK in ('cliffs', 'cemetery', 'props') and os.environ.get('IZO_MMHK', '1') !
         _PRE_Z = shapely.unary_union([Polygon(_mm_xy(p['zona'])) for p in _PRE]).buffer(0) if _PRE else Polygon()
         _PRE_ZP = shapely.prepared.prep(_PRE_Z)
 
+        # dálnice: pasport komunikací (městská data) tu místy kreslí polní cesty přes jízdní pásy dálnice (ve skutečnosti tam žádné křížení není),
+        # proto se povrchy z pasportu v pásu dálnice vynechají (samotná dálnice je z Overture). Vypnout IZO_DALNICE_KRIZENI=0.
+        _sg_ = load('segment'); _MW_L = [r_.geom for _, r_ in _sg_.iterrows() if r_['class'] == 'motorway']   # hook se spouští dřív, než vznikne seg/roads
+        _MW_ZONE = shapely.unary_union([g_.buffer(13.0) for g_ in _MW_L]) if _MW_L and os.environ.get('IZO_DALNICE_KRIZENI', '1') != '0' else Polygon()
+
         def _mm_cut(g):
+            if g is not None and not _MW_ZONE.is_empty and g.intersects(_MW_ZONE):
+                g = g.difference(_MW_ZONE)
+                if g.geom_type == 'MultiPolygon':             # zbytky odříznuté dálnicí (slepé výběžky na druhé straně): malé kusy u pásu dálnice pryč
+                    _keep = [q_ for q_ in g.geoms if q_.area >= 400 or q_.distance(_MW_ZONE) > 1.0]
+                    g = shapely.unary_union(_keep) if _keep else None
+            if g is None or g.is_empty: return None
             if g is not None and not TUNNEL_ZONES.is_empty and g.intersects(TUNNEL_ZONES): g = g.difference(TUNNEL_ZONES)   # nad tunelem (podjezd pod tratí) žádná vozovka z pasportu
             if g is None or g.is_empty: return None
             if _PRE_Z.is_empty or not g.intersects(_PRE_Z): return g

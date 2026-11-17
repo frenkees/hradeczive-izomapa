@@ -543,6 +543,26 @@ for _, r in seg.iterrows():
         if isb and g.length >= BRIDGE_MIN: bridge_segs.append((g, r)); _bridge_raw.append((g, r)); continue
         q = r.copy(); q['geom'] = g; _rows.append(q)
 seg = pd.DataFrame(_rows).reset_index(drop=True)
+# nesmyslná křížení: dálnice se neprotíná v úrovni terénu. Cesta (bez mostu a tunelu, bez společného uzlu), která hlavní jízdní pás dálnice kříží, se u něj
+# přeruší (ve skutečnosti končí u plotu nebo vede po straně; v OSM/Overture bývá napojená přes dálnici omylem, i se společným uzlem). Vypnout IZO_DALNICE_KRIZENI=0.
+if os.environ.get('IZO_DALNICE_KRIZENI', '1') != '0':
+    _mw = [r_.geom for _, r_ in seg.iterrows() if r_['class'] == 'motorway' and r_.subtype == 'road' and str(r_.get('subclass')) != 'link']
+    if _mw:
+        _mwt = shapely.STRtree(_mw); _rows2, _ncl = [], 0
+        for _, r_ in seg.iterrows():
+            if r_['class'] == 'motorway' or r_.subtype == 'rail' or any('is_tunnel' in list(f_.get('values')) for f_ in seg_flags(r_)):
+                _rows2.append(r_); continue
+            _cut = []
+            for k_ in _mwt.query(r_.geom, predicate='crosses'):
+                x_ = r_.geom.intersection(_mw[int(k_)])
+                for pt_ in ([x_] if x_.geom_type == 'Point' else list(getattr(x_, 'geoms', []))):
+                    if pt_.geom_type == 'Point': _cut.append(pt_.buffer(19.0))   # i při společném uzlu: dálnice nemá úrovňové křižovatky s cestami (chyba dat)
+            if not _cut: _rows2.append(r_); continue
+            _ncl += 1
+            for g_ in lines(r_.geom.difference(shapely.unary_union(_cut))):
+                if g_.length >= 3.0: q_ = r_.copy(); q_['geom'] = g_; _rows2.append(q_)
+        if _ncl: print('cest přerušených u dálnice (křížení bez mostu a uzlu):', _ncl)
+        seg = pd.DataFrame(_rows2).reset_index(drop=True)
 RW = {'motorway': 18, 'trunk': 12, 'primary': 10, 'secondary': 9, 'tertiary': 8, 'residential': 6, 'unclassified': 6,
       'living_street': 5, 'service': 3.6, 'pedestrian': 4, 'track': 3, 'footway': 1.8, 'path': 1.6,
       'cycleway': 2, 'steps': 2, 'bridleway': 1.6, 'unknown': 3}
